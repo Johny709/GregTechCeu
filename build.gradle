@@ -82,6 +82,9 @@ minecraft {
     // Add any additional tweaker classes here
     extraTweakClasses.addAll(propertyStringList('extra_tweak_classes'))
 
+    use_access_transformer = true
+    access_transformer_locations = 'gregtech_at.cfg'
+
     // Add various JVM arguments here for runtime
     def args = ['-ea:' + group]
     if (propertyBool('use_mixins')) {
