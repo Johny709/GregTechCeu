@@ -1,0 +1,75 @@
+apply from: 'gradle/scripts/helpers.gradle'
+
+repositories {
+    // Other repositories described by default:
+    // CleanroomMC: https://maven.cleanroommc.com
+    flatDir {
+        dirs 'libs'
+    }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name 'CurseMaven'
+                url 'https://cursemaven.com'
+            }
+        }
+        filter {
+            includeGroup 'curse.maven'
+        }
+    }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name 'Modrinth'
+                url 'https://api.modrinth.com/maven'
+            }
+        }
+        filter {
+            includeGroup 'maven.modrinth'
+        }
+    }
+    mavenLocal() // Must be last for caching to work
+}
+
+dependencies {
+    // Published dependencies
+    api("com.cleanroommc:modularui:3.0.4") { transitive = false }
+    api("com.cleanroommc:groovyscript:1.2.0-hotfix1") { transitive = false }
+    api("curse.maven:inventory-bogosorter-632327:7102721-deobf-6717233-sources-6717234") // Inventory BogoSorter − v1.5.0
+    api("curse.maven:key-binding-patch-928895:5951859") // Key Binding Patch v1.3.3.3, needed by Inventory BogoSorter v1.5.0+
+    api("curse.maven:crafttweaker-239197:5486112")
+    api("curse.maven:had-enough-items-557549:5906628")
+    api("curse.maven:theoneprobe-245211:2667280")
+    api(rfg.deobf(project.files("libs/ae2-uel-v0.56.7-5-g26bb598-dev.jar")))
+    api(rfg.deobf(project.files("libs/CodeChickenLib-1.12.2-3.2.3.358-universal.jar")))
+    api rfg.deobf("curse.maven:ctm-267602:2915363") // CTM 1.0.2.31
+
+    // Non-published dependencies
+    // Change any to devOnlyNonPublishable to test them in-game.
+    compileOnly("curse.maven:journeymap-32274:5172461") // Journeymap 5.7.1p3
+    compileOnly("curse.maven:voxelmap-225179:3029445") // VoxelMap 1.9.28
+    compileOnly("curse.maven:xaeros-263420:5394758") // Xaero's Minimap 24.2.0
+    compileOnly("curse.maven:FTBLib-237167:2985811") //FTB Library 5.4.7.2
+    compileOnly("curse.maven:FTBUtilities-237102:3157548") // FTB Utilities 5.4.1.131
+    //devOnlyNonPublishable rfg.deobf("curse.maven:ftb-library-legacy-forge-237167:2985811") // FTB Library 5.4.7.2
+    //devOnlyNonPublishable rfg.deobf("curse.maven:ftb-utilities-forge-237102:3157548") // FTB Utilities 5.4.1.131
+    compileOnly(rfg.deobf("curse.maven:opencomputers-223008:5274236")) // OpenComputers 1.8.5+179e1c3
+    compileOnly(rfg.deobf("curse.maven:hwyla-253449:2568751")) // HWYLA 1.8.26-B41
+    compileOnly(rfg.deobf("curse.maven:baubles-227083:2518667")) // Baubles 1.5.2
+    compileOnly(rfg.deobf("curse.maven:forestry-59751:2684780")) // Forestry 5.8.2.387
+    compileOnly(rfg.deobf("curse.maven:chisel-235279:2915375")) // Chisel 1.0.2.45
+    compileOnly(rfg.deobf("curse.maven:littletiles-257818:4750222")) // LittleTiles 1.5.82-1.12.2
+    compileOnly(rfg.deobf("curse.maven:creativecore-257814:4722163")) // Creative Core 1.10.71
+
+    testImplementation("org.hamcrest:hamcrest:3.0")
+
+    // Mods with Soft compat but which have no need to be in code, such as isModLoaded() checks and getModItem() recipes.
+    // Uncomment any of these to test them in-game.
+
+    // runtimeOnlyNonPublishable rfg.deobf("curse.maven:beebetteratbees-244516:2627215") // BeeBetterAtBees 2.0.3 (recommended to enable when testing Forestry compat)
+    // runtimeOnlyNonPublishable rfg.deobf("curse.maven:jei-bees-248370:2490058") // JEIBees 0.9.0.5 (recommended to enable when testing Forestry compat)
+    // runtimeOnlyNonPublishable rfg.deobf("curse.maven:binnies-mods-223525:2916129") // Binnie 2.5.1.203
+    // runtimeOnlyNonPublishable rfg.deobf("curse.maven:magic-bees-65764:2855061") // Magic Bees 3.2.25
+    // runtimeOnlyNonPublishable rfg.deobf("curse.maven:gendustry-70492:2516215") // Gendustry 1.6.5.8
+    // runtimeOnlyNonPublishable rfg.deobf("curse.maven:bdlib-70496:2518031") // BdLib 1.14.3.12
+}
