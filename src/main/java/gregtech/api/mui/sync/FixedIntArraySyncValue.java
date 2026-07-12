@@ -71,6 +71,11 @@ public class FixedIntArraySyncValue extends ValueSyncHandler<int[]> {
     }
 
     @Override
+    public void notifyUpdate() {
+
+    }
+
+    @Override
     public void write(@NotNull PacketBuffer buffer) throws IOException {
         for (int i : cache) {
             buffer.writeVarInt(i);
@@ -87,6 +92,11 @@ public class FixedIntArraySyncValue extends ValueSyncHandler<int[]> {
     @Override
     public int[] getValue() {
         return this.cache;
+    }
+
+    @Override
+    public Class<int[]> getValueType() {
+        return null;
     }
 
     public int getValue(int index) {

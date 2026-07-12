@@ -48,9 +48,9 @@ public class GTTextFieldWidget extends BaseTextFieldWidget<GTTextFieldWidget> {
 
     public double parse(String num) {
         ParseResult result = MathUtils.parseExpression(num, this.defaultNumber, true);
-        double value = result.getResult();
+        double value = result.getResult().getNumberValue().doubleValue();
         if (result.isFailure()) {
-            String mathFailMessage = result.getError();
+            String mathFailMessage = String.valueOf(result.getError());
             GTLog.logger.error("Math expression error in {}: {}", this, mathFailMessage);
         }
         return value;
