@@ -177,6 +177,12 @@ public class Elements {
     }
 
     @ZenMethod
+    public static Element add(long protons, long neutrons, long halfLifeSeconds, String decayTo, String name,
+                              String symbol, boolean isIsotope) {
+        return add(protons, neutrons, (double) halfLifeSeconds, decayTo, name, symbol, isIsotope);
+    }
+
+    @ZenMethod
     public static Element add(long protons, long neutrons, double halfLifeSeconds, String decayTo, String name,
                               String symbol, boolean isIsotope) {
         validateNameAndSymbol(name, symbol);
