@@ -2,8 +2,8 @@
   "modid": "gregtech",
   "name": "GregTech",
   "description": "Finally, the awesome technology of GregTech-Intergalactical can be used in 1.12, now new and improved!",
-  "version": "${mod_version}",
-  "mcversion": "1.12.2",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
   "logoFile": "assets/gregtech/textures/gt_logo_long.png",
   "url": "https://www.curseforge.com/minecraft/mc-mods/gregtech-ce-unofficial",
   "authorList": [
