@@ -1,4 +1,4 @@
-apply from: 'helpers.gradle'
+apply from: 'gradle/scripts/helpers.gradle'
 
 setDefaultProperty('publish_to_maven', true, false)
 setDefaultProperty('publish_to_curseforge', true, false)

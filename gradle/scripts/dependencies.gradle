@@ -1,4 +1,4 @@
-apply from: 'helpers.gradle'
+apply from: 'gradle/scripts/helpers.gradle'
 
 repositories {
     // Other repositories described by default:
