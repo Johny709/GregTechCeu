@@ -2,12 +2,14 @@ package gregtech.core.network.packets;
 
 import gregtech.common.gui.widget.prospector.ProspectorMode;
 
+import it.unimi.dsi.fastutil.bytes.Byte2ObjectMap;
+import it.unimi.dsi.fastutil.bytes.Byte2ObjectOpenHashMap;
+
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.PacketBuffer;
 
 import io.netty.buffer.Unpooled;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -20,7 +22,7 @@ public class PacketProspecting {
     public int posX;
     public int posZ;
     public ProspectorMode mode;
-    public HashMap<Byte, String>[][] map;
+    public Byte2ObjectMap<String>[][] map;
     public Set<String> ores;
 
     @SuppressWarnings("unused")
@@ -37,10 +39,10 @@ public class PacketProspecting {
         this.mode = mode;
         if (mode == ProspectorMode.FLUID) {
             // noinspection unchecked
-            map = new HashMap[1][1];
+            map = new Byte2ObjectOpenHashMap[1][1];
         } else {
             // noinspection unchecked
-            map = new HashMap[16][16];
+            map = new Byte2ObjectOpenHashMap[16][16];
         }
 
         ores = new HashSet<>();
@@ -59,7 +61,7 @@ public class PacketProspecting {
             for (int j = 0; j < aSize; j++) {
                 byte kSize = buffer.readByte();
                 if (kSize == 0) continue;
-                packet.map[i][j] = new HashMap<>();
+                packet.map[i][j] = new Byte2ObjectOpenHashMap<>();
                 for (int k = 0; k < kSize; k++) {
                     byte y = buffer.readByte();
                     String name = buffer.readString(1000);
@@ -126,12 +128,12 @@ public class PacketProspecting {
     public void addBlock(int x, int y, int z, String orePrefix) {
         if (this.mode == ProspectorMode.ORE) {
             if (map[x][z] == null)
-                map[x][z] = new HashMap<>();
+                map[x][z] = new Byte2ObjectOpenHashMap<>();
             map[x][z].put((byte) y, orePrefix);
             ores.add(orePrefix);
         } else if (this.mode == ProspectorMode.FLUID) {
             if (map[x][z] == null)
-                map[x][z] = new HashMap<>();
+                map[x][z] = new Byte2ObjectOpenHashMap<>();
             map[x][z].put((byte) y, orePrefix);
             if (y == 1) {
                 ores.add(orePrefix);

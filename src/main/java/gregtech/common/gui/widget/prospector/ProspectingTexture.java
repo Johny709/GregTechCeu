@@ -5,6 +5,8 @@ import gregtech.api.unification.stack.MaterialStack;
 import gregtech.client.utils.RenderUtil;
 import gregtech.core.network.packets.PacketProspecting;
 
+import it.unimi.dsi.fastutil.bytes.Byte2ObjectMap;
+
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.client.renderer.texture.AbstractTexture;
@@ -30,8 +32,8 @@ public class ProspectingTexture extends AbstractTexture {
     private boolean darkMode;
     private int imageWidth = -1;
     private int imageHeight = -1;
-    public final Map<Byte, String>[][] map;
-    public static Map<Byte, String> emptyTag = new Byte2ObjectOpenHashMap<>();
+    public final Byte2ObjectMap<String>[][] map;
+    public static Byte2ObjectMap<String> emptyTag = new Byte2ObjectOpenHashMap<>();
     private int playerXGui;
     private int playerYGui;
     private final ProspectorMode mode;
