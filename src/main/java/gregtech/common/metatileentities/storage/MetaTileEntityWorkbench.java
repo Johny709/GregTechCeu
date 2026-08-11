@@ -384,10 +384,6 @@ public class MetaTileEntityWorkbench extends MetaTileEntity {
 
         for (int i = 0; i < this.connectedInventory.getSlots(); i++) {
             list.add(new ItemSlot()
-                    .setEnabledIf(itemSlot -> {
-                        int slot = itemSlot.getSlot().getSlotIndex();
-                        return slot < this.connectedInventory.getSlots();
-                    })
                     .slot(trackSlot(this.connectedInventory, i)
                             .slotGroup(connected)));
         }
@@ -410,10 +406,16 @@ public class MetaTileEntityWorkbench extends MetaTileEntity {
                 .coverChildren()
                 .background(GTGuiTextures.DISPLAY)
                 .child(new Grid()
-                        .scrollable(new VerticalScrollData())
+                        .scrollable(new VerticalScrollData() {{
+                            this.setScrollSize(Math.max(6, connectedInventory.getSlots() / Math.max(1, rowSize)) * 18);
+                        }})
                         .width(18 * 8 + 4)
                         .height(18 * 6)
-                        .mapTo(rowSize, list));
+                        .gridOfWidthElements(rowSize, list, (x, y, i, itemSlot) -> itemSlot
+                                .setEnabledIf(itemSlot1 -> {
+                                    int slot = itemSlot1.getSlot().getSlotIndex();
+                                    return slot < this.connectedInventory.getSlots();
+                                })));
     }
 
     public void sendHandlerToClient(PacketBuffer buffer) {
