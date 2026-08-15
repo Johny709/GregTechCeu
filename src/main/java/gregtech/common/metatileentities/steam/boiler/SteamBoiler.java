@@ -1,19 +1,29 @@
 package gregtech.common.metatileentities.steam.boiler;
 
+import com.cleanroommc.modularui.api.drawable.IDrawable;
+import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.drawable.UITexture;
+import com.cleanroommc.modularui.factory.PosGuiData;
+import com.cleanroommc.modularui.screen.ModularPanel;
+import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
+import com.cleanroommc.modularui.value.sync.IntSyncValue;
+import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.cleanroommc.modularui.widget.Widget;
+import com.cleanroommc.modularui.widgets.ProgressWidget;
+import com.cleanroommc.modularui.widgets.slot.ItemSlot;
+import com.cleanroommc.modularui.widgets.slot.ModularSlot;
 import gregtech.api.GTValues;
 import gregtech.api.capability.impl.CommonFluidFilters;
 import gregtech.api.capability.impl.FilteredFluidHandler;
 import gregtech.api.capability.impl.FluidTankList;
-import gregtech.api.gui.GuiTextures;
-import gregtech.api.gui.ModularUI;
 import gregtech.api.gui.resources.TextureArea;
-import gregtech.api.gui.widgets.FluidContainerSlotWidget;
-import gregtech.api.gui.widgets.ProgressWidget;
-import gregtech.api.gui.widgets.ProgressWidget.MoveType;
-import gregtech.api.gui.widgets.TankWidget;
 import gregtech.api.items.itemhandlers.GTItemStackHandler;
 import gregtech.api.metatileentity.IDataInfoProvider;
 import gregtech.api.metatileentity.MetaTileEntity;
+import gregtech.api.mui.GTGuiTextures;
+import gregtech.api.mui.GTGuiTheme;
+import gregtech.api.mui.GTGuis;
 import gregtech.api.unification.material.Materials;
 import gregtech.api.util.GTTransferUtils;
 import gregtech.api.util.GTUtility;
@@ -23,11 +33,10 @@ import gregtech.client.renderer.ICubeRenderer;
 import gregtech.client.renderer.texture.Textures;
 import gregtech.client.renderer.texture.cube.SimpleSidedCubeRenderer;
 import gregtech.common.ConfigHolder;
+import gregtech.common.mui.widget.GTFluidSlot;
 import gregtech.core.sound.GTSoundEvents;
-
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.I18n;
-import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.SoundEvents;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
@@ -331,28 +340,80 @@ public abstract class SteamBoiler extends MetaTileEntity implements IDataInfoPro
                 type, STRING_SUBSTITUTION_PATTERN.matcher(pathTemplate).replaceAll(Matcher.quoteReplacement(type))));
     }
 
-    public ModularUI.Builder createUITemplate(EntityPlayer player) {
-        return ModularUI.builder(GuiTextures.BACKGROUND_STEAM.get(isHighPressure), 176, 166)
-                .label(6, 6, getMetaFullName()).shouldColor(false)
-                .widget(new ProgressWidget(this::getTemperaturePercent, 96, 26, 10, 54)
-                        .setProgressBar(GuiTextures.PROGRESS_BAR_BOILER_EMPTY.get(isHighPressure),
-                                GuiTextures.PROGRESS_BAR_BOILER_HEAT,
-                                MoveType.VERTICAL))
+    @Override
+    public boolean usesMui2() {
+        return true;
+    }
 
-                .widget(new TankWidget(waterFluidTank, 83, 26, 10, 54)
-                        .setBackgroundTexture(GuiTextures.PROGRESS_BAR_BOILER_EMPTY.get(isHighPressure)))
-                .widget(new TankWidget(steamFluidTank, 70, 26, 10, 54)
-                        .setBackgroundTexture(GuiTextures.PROGRESS_BAR_BOILER_EMPTY.get(isHighPressure)))
+    @Override
+    public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager panelSyncManager, UISettings settings) {
+        IntSyncValue temp = new IntSyncValue(this::getCurrentTemperature);
+        panelSyncManager.syncValue("temperature", temp);
+        return GTGuis.defaultPanel(this)
+                .child(IKey.lang(getMetaFullName()).asWidget().pos(5, 5))
+                .child(new ProgressWidget()
+                        .texture(getEmptyBarDrawable(), GTGuiTextures.PROGRESS_BAR_BOILER_HEAT, -1)
+                        .direction(ProgressWidget.Direction.UP)
+                        .name("temp")
+                        .tooltipBuilder(
+                                tooltip -> tooltip.addLine(IKey.lang("gregtech.machine.steam_boiler.heat_tooltip",
+                                        temp.getIntValue(), getMaxTemperate())))
+                        .value(new DoubleSyncValue(this::getTemperaturePercent))
+                        .pos(96, 26)
+                        .size(10, 54))
+                .child(new GTFluidSlot()
+                        .name("water")
+                        .background(getEmptyBarDrawable())
+                        .syncHandler(GTFluidSlot.sync(waterFluidTank)
+                                .showAmountOnSlot(false)
+                                .accessibility(false, false))
+                        .pos(83, 26)
+                        .size(10, 54))
+                .child(new GTFluidSlot()
+                        .name("steam")
+                        .background(getEmptyBarDrawable())
+                        .syncHandler(GTFluidSlot.sync(steamFluidTank)
+                                .showAmountOnSlot(false)
+                                .accessibility(false, false))
+                        .pos(70, 26)
+                        .size(10, 54))
+                .child(new ItemSlot()
+                        .name("fluid in")
+                        .background(getSlotBackground(false))
+                        .slot(new ModularSlot(containerInventory, 0)
+                                .singletonSlotGroup())
+                        .pos(43, 26))
+                .child(new ItemSlot()
+                        .name("fluid out")
+                        .background(getSlotBackground(true))
+                        .slot(new ModularSlot(containerInventory, 1)
+                                .accessibility(false, true))
+                        .pos(43, 62))
+                .child(new Widget<>()
+                        .pos(43, 44)
+                        .size(18)
+                        .background(isHighPressure ? GTGuiTextures.CANISTER_OVERLAY_STEEL :
+                                GTGuiTextures.CANISTER_OVERLAY_BRONZE))
+                .bindPlayerInventory();
+    }
 
-                .widget(new FluidContainerSlotWidget(containerInventory, 0, 43, 26, true)
-                        .setBackgroundTexture(GuiTextures.SLOT_STEAM.get(isHighPressure),
-                                GuiTextures.IN_SLOT_OVERLAY_STEAM.get(isHighPressure)))
-                .slot(containerInventory, 1, 43, 62, true, false,
-                        GuiTextures.SLOT_STEAM.get(isHighPressure),
-                        GuiTextures.OUT_SLOT_OVERLAY_STEAM.get(isHighPressure))
-                .image(43, 44, 18, 18, GuiTextures.CANISTER_OVERLAY_STEAM.get(isHighPressure))
+    @Override
+    public GTGuiTheme getUITheme() {
+        return isHighPressure ? GTGuiTheme.STEEL : GTGuiTheme.BRONZE;
+    }
 
-                .bindPlayerInventory(player.inventory, GuiTextures.SLOT_STEAM.get(isHighPressure), 0);
+    protected UITexture getEmptyBarDrawable() {
+        return isHighPressure ? GTGuiTextures.PROGRESS_BAR_BOILER_EMPTY_STEEL :
+                GTGuiTextures.PROGRESS_BAR_BOILER_EMPTY_BRONZE;
+    }
+
+    protected IDrawable getSlotBackground(boolean output) {
+        UITexture base = isHighPressure ? GTGuiTextures.SLOT_STEEL : GTGuiTextures.SLOT_BRONZE;
+        UITexture overlay;
+        if (isHighPressure)
+            overlay = output ? GTGuiTextures.OUT_SLOT_OVERLAY_STEEL : GTGuiTextures.IN_SLOT_OVERLAY_STEEL;
+        else overlay = output ? GTGuiTextures.OUT_SLOT_OVERLAY_BRONZE : GTGuiTextures.IN_SLOT_OVERLAY_BRONZE;
+        return IDrawable.of(base, overlay);
     }
 
     @Override

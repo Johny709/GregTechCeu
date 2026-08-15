@@ -1,5 +1,17 @@
 package gregtech.api.metatileentity;
 
+import com.cleanroommc.modularui.api.drawable.IDrawable;
+import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.drawable.DynamicDrawable;
+import com.cleanroommc.modularui.factory.PosGuiData;
+import com.cleanroommc.modularui.screen.ModularPanel;
+
+import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.value.sync.BooleanSyncValue;
+import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+
+import com.cleanroommc.modularui.widgets.SlotGroupWidget;
+
 import gregtech.api.GTValues;
 import gregtech.api.capability.impl.CommonFluidFilters;
 import gregtech.api.capability.impl.FilteredFluidHandler;
@@ -8,6 +20,8 @@ import gregtech.api.capability.impl.RecipeLogicSteam;
 import gregtech.api.gui.GuiTextures;
 import gregtech.api.gui.ModularUI;
 import gregtech.api.gui.widgets.ImageWidget;
+import gregtech.api.mui.GTGuiTextures;
+import gregtech.api.mui.GTGuiTheme;
 import gregtech.api.recipes.RecipeMap;
 import gregtech.api.util.GTUtility;
 import gregtech.client.particle.VanillaParticleEffects;
@@ -125,6 +139,50 @@ public abstract class SteamMetaTileEntity extends MetaTileEntity {
     public FluidTankList createImportFluidHandler() {
         this.steamFluidTank = new FilteredFluidHandler(STEAM_CAPACITY).setFilter(CommonFluidFilters.STEAM);
         return new FluidTankList(false, steamFluidTank);
+    }
+
+    @Override
+    public boolean usesMui2() {
+        RecipeMap<?> map = getRecipeMap();
+        return map != null && map.getRecipeMapUI().usesMui2();
+    }
+
+    @Override
+    public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager panelSyncManager, UISettings settings) {
+        RecipeMap<?> map = Objects.requireNonNull(getRecipeMap());
+
+        BooleanSyncValue hasNoSteam = new BooleanSyncValue(workableHandler::isHasNotEnoughEnergy);
+        panelSyncManager.syncValue("has_energy", hasNoSteam);
+
+        ModularPanel panel = map.getRecipeMapUI()
+                .constructPanel(this, builder -> builder
+                        .setMaxSize(176, 170)
+                        .setInputs(importItems, importFluids)
+                        .setOutputs(exportItems, exportFluids)
+                        .inventorySlotGroups()
+                        .progressWidget(workableHandler::getProgressPercent, widget -> {
+                            // todo add tooltip for no steam?
+                            widget.overlay(new DynamicDrawable(() -> hasNoSteam.getBoolValue() ?
+                                    getIndicator() : IDrawable.NONE)
+                                    .asIcon().size(18).marginTop(50));
+                        }));
+        return panel.child(IKey.lang(getMetaFullName()).asWidget().pos(5, 5))
+                .child(getUITheme().getLogo().asWidget()
+                        .size(16)
+                        .right(7)
+                        .top(46))
+                .child(SlotGroupWidget.playerInventory((index, widgetSlot) -> widgetSlot
+                                .background(GTGuiTextures.SLOT))
+                        .horizontalCenter().bottom(7));
+    }
+
+    public IDrawable getIndicator() {
+        return isHighPressure ? GTGuiTextures.INDICATOR_NO_STEAM_STEEL : GTGuiTextures.INDICATOR_NO_STEAM_BRONZE;
+    }
+
+    @Override
+    public GTGuiTheme getUITheme() {
+        return isHighPressure ? GTGuiTheme.STEEL : GTGuiTheme.BRONZE;
     }
 
     public ModularUI.Builder createUITemplate(EntityPlayer player) {
