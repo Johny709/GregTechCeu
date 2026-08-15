@@ -89,7 +89,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
     private ProgressWidget.Direction progressDirection = ProgressWidget.Direction.RIGHT;
     private Consumer<Widget<?>> extraOverlays = null;
     private int width = GTGuis.DEFAULT_WIDTH;
-    private int height = GTGuis.DEFAULT_HIEGHT;
+    private int height = GTGuis.DEFAULT_HEIGHT;
 
     @Deprecated
     /**
@@ -628,7 +628,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
     public class PanelBuilder {
 
         private int width = GTGuis.DEFAULT_WIDTH;
-        private int height = GTGuis.DEFAULT_HIEGHT;
+        private int height = GTGuis.DEFAULT_HEIGHT;
         private @NotNull CalculatedGrid inputs = CalculatedGrid.EMPTY;
         private @NotNull CalculatedGrid outputs = CalculatedGrid.EMPTY;
         private BiConsumer<ModularPanel, @NotNull Integer> extraWidgets;
