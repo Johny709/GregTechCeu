@@ -72,7 +72,7 @@ public class FixedIntArraySyncValue extends ValueSyncHandler<int[]> {
 
     @Override
     public void notifyUpdate() {
-
+        setValue(this.getter.get(), false, true);
     }
 
     @Override
@@ -94,12 +94,12 @@ public class FixedIntArraySyncValue extends ValueSyncHandler<int[]> {
         return this.cache;
     }
 
-    @Override
-    public Class<int[]> getValueType() {
-        return null;
-    }
-
     public int getValue(int index) {
         return this.cache[index];
+    }
+
+    @Override
+    public Class<int[]> getValueType() {
+        return int[].class;
     }
 }

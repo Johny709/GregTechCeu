@@ -3,15 +3,11 @@ package gregtech.api.metatileentity;
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.drawable.DynamicDrawable;
-import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
-
 import com.cleanroommc.modularui.screen.UISettings;
 import com.cleanroommc.modularui.value.sync.BooleanSyncValue;
 import com.cleanroommc.modularui.value.sync.PanelSyncManager;
-
 import com.cleanroommc.modularui.widgets.SlotGroupWidget;
-
 import gregtech.api.GTValues;
 import gregtech.api.capability.impl.CommonFluidFilters;
 import gregtech.api.capability.impl.FilteredFluidHandler;
@@ -22,6 +18,8 @@ import gregtech.api.gui.ModularUI;
 import gregtech.api.gui.widgets.ImageWidget;
 import gregtech.api.mui.GTGuiTextures;
 import gregtech.api.mui.GTGuiTheme;
+import gregtech.api.mui.IMetaTileEntityGuiHolder;
+import gregtech.api.mui.MetaTileEntityGuiData;
 import gregtech.api.recipes.RecipeMap;
 import gregtech.api.util.GTUtility;
 import gregtech.client.particle.VanillaParticleEffects;
@@ -55,7 +53,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Objects;
 
-public abstract class SteamMetaTileEntity extends MetaTileEntity {
+public abstract class SteamMetaTileEntity extends MetaTileEntity implements IMetaTileEntityGuiHolder {
 
     protected static final int STEAM_CAPACITY = 16000;
 
@@ -142,13 +140,7 @@ public abstract class SteamMetaTileEntity extends MetaTileEntity {
     }
 
     @Override
-    public boolean usesMui2() {
-        RecipeMap<?> map = getRecipeMap();
-        return map != null && map.getRecipeMapUI().usesMui2();
-    }
-
-    @Override
-    public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager panelSyncManager, UISettings settings) {
+    public ModularPanel buildUI(MetaTileEntityGuiData guiData, PanelSyncManager panelSyncManager, UISettings settings) {
         RecipeMap<?> map = Objects.requireNonNull(getRecipeMap());
 
         BooleanSyncValue hasNoSteam = new BooleanSyncValue(workableHandler::isHasNotEnoughEnergy);
@@ -194,7 +186,7 @@ public abstract class SteamMetaTileEntity extends MetaTileEntity {
     }
 
     @Override
-    public SoundEvent getSound() {
+    public @Nullable SoundEvent getSound() {
         return Objects.requireNonNull(workableHandler.getRecipeMap()).getSound();
     }
 

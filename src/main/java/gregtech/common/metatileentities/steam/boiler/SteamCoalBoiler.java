@@ -1,6 +1,5 @@
 package gregtech.common.metatileentities.steam.boiler;
 
-import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
 import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
@@ -12,6 +11,7 @@ import gregtech.api.items.itemhandlers.GTItemStackHandler;
 import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.interfaces.IGregTechTileEntity;
 import gregtech.api.mui.GTGuiTextures;
+import gregtech.api.mui.MetaTileEntityGuiData;
 import gregtech.api.recipes.ModHandler;
 import gregtech.api.recipes.category.ICategoryOverride;
 import gregtech.client.renderer.texture.Textures;
@@ -87,7 +87,7 @@ public class SteamCoalBoiler extends SteamBoiler implements ICategoryOverride {
     }
 
     @Override
-    public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager panelSyncManager, UISettings settings) {
+    public @NotNull ModularPanel buildUI(MetaTileEntityGuiData guiData, PanelSyncManager panelSyncManager, UISettings settings) {
         return super.buildUI(guiData, panelSyncManager, settings)
                 .child(new ItemSlot()
                         .slot(this.importItems, 0)

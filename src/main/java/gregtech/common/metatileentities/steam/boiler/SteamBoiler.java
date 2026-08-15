@@ -3,7 +3,6 @@ package gregtech.common.metatileentities.steam.boiler;
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.api.drawable.IKey;
 import com.cleanroommc.modularui.drawable.UITexture;
-import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
 import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
@@ -24,6 +23,8 @@ import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.mui.GTGuiTextures;
 import gregtech.api.mui.GTGuiTheme;
 import gregtech.api.mui.GTGuis;
+import gregtech.api.mui.IMetaTileEntityGuiHolder;
+import gregtech.api.mui.MetaTileEntityGuiData;
 import gregtech.api.unification.material.Materials;
 import gregtech.api.util.GTTransferUtils;
 import gregtech.api.util.GTUtility;
@@ -68,7 +69,7 @@ import java.util.regex.Pattern;
 
 import static gregtech.api.capability.GregtechDataCodes.IS_WORKING;
 
-public abstract class SteamBoiler extends MetaTileEntity implements IDataInfoProvider {
+public abstract class SteamBoiler extends MetaTileEntity implements IDataInfoProvider, IMetaTileEntityGuiHolder {
 
     private static final Pattern STRING_SUBSTITUTION_PATTERN = Pattern.compile("%s", Pattern.LITERAL);
 
@@ -341,12 +342,7 @@ public abstract class SteamBoiler extends MetaTileEntity implements IDataInfoPro
     }
 
     @Override
-    public boolean usesMui2() {
-        return true;
-    }
-
-    @Override
-    public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager panelSyncManager, UISettings settings) {
+    public ModularPanel buildUI(MetaTileEntityGuiData guiData, PanelSyncManager panelSyncManager, UISettings settings) {
         IntSyncValue temp = new IntSyncValue(this::getCurrentTemperature);
         panelSyncManager.syncValue("temperature", temp);
         return GTGuis.defaultPanel(this)
@@ -431,7 +427,7 @@ public abstract class SteamBoiler extends MetaTileEntity implements IDataInfoPro
     }
 
     @Override
-    public SoundEvent getSound() {
+    public @Nullable SoundEvent getSound() {
         return GTSoundEvents.BOILER;
     }
 
