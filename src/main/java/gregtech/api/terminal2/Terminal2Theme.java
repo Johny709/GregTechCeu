@@ -16,7 +16,6 @@ import java.io.File;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @SuppressWarnings("unused")
@@ -27,7 +26,7 @@ public class Terminal2Theme {
     private static final UITexture defaultBackground = UITexture
             .fullImage(GTUtility.gregtechId("textures/gui/terminal/terminal_background.png"));
     public static File backgroundsDir;
-    private static final Map<String, Integer> defaultColors = new Object2IntOpenHashMap<>();
+    private static final Object2IntOpenHashMap<String> defaultColors = new Object2IntOpenHashMap<>();
 
     public static String currentBackground = "default";
     // theres enough colors here to make specifying stuff for all of them annoying
@@ -128,11 +127,11 @@ public class Terminal2Theme {
     }
 
     public static void resetToDefaultColor(String color) {
-        setColor(color, defaultColors.get(color));
+        setColor(color, defaultColors.getInt(color));
     }
 
     public static boolean isDefaultColor(String color) {
-        return getColorRect(color).getColor() == defaultColors.get(color);
+        return getColorRect(color).getColor() == defaultColors.getInt(color);
     }
 
     public static void gcBoundRects() {
