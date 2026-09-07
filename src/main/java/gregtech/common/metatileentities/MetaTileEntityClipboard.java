@@ -11,8 +11,11 @@ import gregtech.api.items.metaitem.stats.IItemBehaviour;
 import gregtech.api.items.toolitem.ToolClasses;
 import gregtech.api.metatileentity.IFastRenderMetaTileEntity;
 import gregtech.api.metatileentity.MetaTileEntity;
-import gregtech.api.metatileentity.MetaTileEntityUIFactory;
 import gregtech.api.metatileentity.interfaces.IGregTechTileEntity;
+import gregtech.api.mui.GTGuiTheme;
+import gregtech.api.mui.IMetaTileEntityGuiHolder;
+import gregtech.api.mui.MetaTileEntityGuiData;
+import gregtech.api.mui.factory.MetaTileEntityGuiFactory;
 import gregtech.api.util.GTLog;
 import gregtech.api.util.GregFakePlayer;
 import gregtech.client.renderer.texture.custom.ClipboardRenderer;
@@ -52,6 +55,9 @@ import codechicken.lib.render.CCRenderState;
 import codechicken.lib.render.pipeline.IVertexOperation;
 import codechicken.lib.vec.Matrix4;
 import codechicken.lib.vec.Vector3;
+import com.cleanroommc.modularui.screen.ModularPanel;
+import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.value.sync.PanelSyncManager;
 import io.netty.buffer.Unpooled;
 import org.apache.commons.lang3.tuple.Pair;
 import org.jetbrains.annotations.NotNull;
@@ -59,14 +65,14 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import static codechicken.lib.raytracer.RayTracer.*;
 import static gregtech.api.capability.GregtechDataCodes.*;
 import static gregtech.client.renderer.texture.Textures.CLIPBOARD_RENDERER;
 import static gregtech.common.items.MetaItems.CLIPBOARD;
 
-public class MetaTileEntityClipboard extends MetaTileEntity implements IFastRenderMetaTileEntity {
+public class MetaTileEntityClipboard extends MetaTileEntity
+                                     implements IFastRenderMetaTileEntity, IMetaTileEntityGuiHolder {
 
     private static final AxisAlignedBB CLIPBOARD_AABB_NORTH = new AxisAlignedBB(2.75 / 16.0, 0, 0, 13.25 / 16.0,
             16 / 16.0, 0.4 / 16.0);
@@ -148,26 +154,29 @@ public class MetaTileEntityClipboard extends MetaTileEntity implements IFastRend
     }
 
     @Override
-    public ModularUI createUI(EntityPlayer entityPlayer) {
-        if (getClipboard().isItemEqual(CLIPBOARD.getStackForm())) {
-            List<IItemBehaviour> behaviours = ((MetaItem<?>) getClipboard().getItem()).getBehaviours(getClipboard());
-            Optional<IItemBehaviour> clipboardBehaviour = behaviours.stream()
-                    .filter((x) -> x instanceof ClipboardBehavior).findFirst();
-            if (!clipboardBehaviour.isPresent())
-                return null;
-            if (clipboardBehaviour.get() instanceof ClipboardBehavior) {
-                PlayerInventoryHolder holder = new PlayerInventoryHolder(new GregFakePlayer(entityPlayer.world),
-                        EnumHand.MAIN_HAND); // We can't have this actually set the player's hand
-                holder.setCustomValidityCheck(this::isValid).setCurrentItem(this.getClipboard());
-                if (entityPlayer instanceof GregFakePlayer) { // This is how to tell if this is being called in-world or
-                                                              // not
-                    return ClipboardBehavior.createMTEUI(holder, entityPlayer);
-                } else {
-                    return ((ClipboardBehavior) clipboardBehaviour.get()).createUI(holder, entityPlayer);
-                }
-            }
-        }
-        return null;
+    public GTGuiTheme getUITheme() {
+        return GTGuiTheme.CLIPBOARD;
+    }
+
+    @Override
+    public @NotNull ModularPanel buildUI(MetaTileEntityGuiData guiData, PanelSyncManager guiSyncManager,
+                                         UISettings settings) {
+        return ClipboardBehavior.createPanel(getClipboard(), this::getClipboard, guiSyncManager, this::markDirty);
+    }
+
+    /**
+     * The page drawn on the clipboard hanging on the wall. Still legacy MUI, as MUI2 cannot render a panel outside of
+     * a gui screen yet.
+     */
+    private ModularUI createFakeUI(GregFakePlayer fakePlayer) {
+        if (!getClipboard().isItemEqual(CLIPBOARD.getStackForm())) return null;
+        List<IItemBehaviour> behaviours = ((MetaItem<?>) getClipboard().getItem()).getBehaviours(getClipboard());
+        if (behaviours.stream().noneMatch(behaviour -> behaviour instanceof ClipboardBehavior)) return null;
+
+        // We can't have this actually set the player's hand
+        PlayerInventoryHolder holder = new PlayerInventoryHolder(fakePlayer, EnumHand.MAIN_HAND);
+        holder.setCustomValidityCheck(this::isValid).setCurrentItem(this.getClipboard());
+        return ClipboardBehavior.createMTEUI(holder, fakePlayer);
     }
 
     public void createFakeGui() {
@@ -176,7 +185,7 @@ public class MetaTileEntityClipboard extends MetaTileEntity implements IFastRend
         try {
             GregFakePlayer fakePlayer = new GregFakePlayer(this.getWorld());
             fakePlayer.setHeldItem(EnumHand.MAIN_HAND, this.getClipboard());
-            ModularUI ui = this.createUI(fakePlayer);
+            ModularUI ui = this.createFakeUI(fakePlayer);
 
             ModularUI.Builder builder = new ModularUI.Builder(ui.backgroundPath, ui.getWidth(), ui.getHeight());
             builder.shouldColor(false);
@@ -242,7 +251,7 @@ public class MetaTileEntityClipboard extends MetaTileEntity implements IFastRend
                                 CuboidRayTraceResult hitResult) {
         if (!playerIn.isSneaking()) {
             if (getWorld() != null && !getWorld().isRemote) {
-                MetaTileEntityUIFactory.INSTANCE.openUI(getHolder(), (EntityPlayerMP) playerIn);
+                MetaTileEntityGuiFactory.open((EntityPlayerMP) playerIn, this);
             }
         } else {
             breakClipboard(playerIn);
