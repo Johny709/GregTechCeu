@@ -5,7 +5,6 @@ import gregtech.api.metatileentity.MetaTileEntity;
 import gregtech.api.metatileentity.SimpleGeneratorMetaTileEntity;
 import gregtech.api.metatileentity.SimpleMachineMetaTileEntity;
 import gregtech.common.metatileentities.MetaTileEntityClipboard;
-import gregtech.common.metatileentities.electric.MetaTileEntityPump;
 import gregtech.common.metatileentities.multi.electric.centralmonitor.MetaTileEntityCentralMonitor;
 import gregtech.common.metatileentities.multi.electric.centralmonitor.MetaTileEntityMonitorScreen;
 import gregtech.common.metatileentities.multi.multiblockpart.appeng.MetaTileEntityMEInputBus;
@@ -35,7 +34,6 @@ import org.jetbrains.annotations.NotNull;
  * - {@link SimpleGeneratorMetaTileEntity} - PR 2808 <br/>
  * - {@link SimpleMachineMetaTileEntity} - PR 2808 <br/>
  * - {@link MetaTileEntityClipboard} <br/>
- * - {@link MetaTileEntityPump} <br/>
  * - {@link MetaTileEntityCentralMonitor} <br/>
  * - {@link MetaTileEntityMonitorScreen} <br/>
  * - {@link MetaTileEntityMEInputBus} - PR 2824 <br/>
