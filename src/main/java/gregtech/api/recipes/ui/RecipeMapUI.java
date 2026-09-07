@@ -772,6 +772,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                     .name(String.format("col:%s_item_group", isOutputs ? "output" : "input"));
             int width = grid.getItemGridWidth();
             int height = grid.getItemGridHeight();
+            int count = grid.getItemCount();
 
             SlotGroup slotGroup = new SlotGroup(isOutputs ? "output_items" : "input_items", width, 1, !isOutputs);
             for (int i = 0; i < height; i++) {
@@ -780,7 +781,11 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                         .coverChildren()
                         .name("row:item_" + i);
                 for (int j = 0; j < width; j++) {
-                    row.child(makeItemSlot(slotGroup, (i * height) + j, grid.getItemHandler(), isOutputs));
+                    int slotIndex = (i * width) + j;
+                    // the grid can hold more slots than the handler has, fill the remainder with empty cells
+                    // so the columns stay aligned
+                    row.child(slotIndex < count ? makeItemSlot(slotGroup, slotIndex, grid.getItemHandler(), isOutputs) :
+                            emptyCell());
                 }
                 col.child(row);
             }
@@ -795,6 +800,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
 
             int width = grid.getFluidGridWidth();
             int height = grid.getFluidGridHeight();
+            int count = grid.getFluidCount();
 
             for (int i = 0; i < height; i++) {
                 Flow row = Flow.row()
@@ -802,7 +808,9 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                         .coverChildren()
                         .name("row:fluid_" + i);
                 for (int j = 0; j < width; j++) {
-                    row.child(makeFluidSlot((i * height) + j, grid.getFluidHandler(), isOutputs));
+                    int slotIndex = (i * width) + j;
+                    row.child(slotIndex < count ? makeFluidSlot(slotIndex, grid.getFluidHandler(), isOutputs) :
+                            emptyCell());
                 }
                 col.child(row);
             }
@@ -851,6 +859,11 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
             }
 
             return flow;
+        }
+
+        /** A blank cell of slot size, used to pad grids which are larger than the amount of slots. */
+        protected IWidget emptyCell() {
+            return new Widget<>().size(18);
         }
 
         protected ItemSlot makeItemSlot(SlotGroup group, int slotIndex, IItemHandlerModifiable itemHandler,
