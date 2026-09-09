@@ -40,6 +40,7 @@ import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidUtil;
 import net.minecraftforge.fluids.IFluidTank;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
+import net.minecraftforge.fluids.capability.IFluidTankProperties;
 import net.minecraftforge.items.IItemHandlerModifiable;
 
 import codechicken.lib.render.CCRenderState;
@@ -360,7 +361,14 @@ public class MetaTileEntityFluidHatch extends MetaTileEntityMultiblockNotifiable
                                     if (!isExportHatch) return true;
                                     var h = FluidUtil.getFluidHandler(stack);
                                     if (h == null) return false;
-                                    return h.getTankProperties()[0].getContents() == null;
+                                    // the export hatch only fills containers, so accept every container which
+                                    // still has room left, including partially filled ones
+                                    for (IFluidTankProperties properties : h.getTankProperties()) {
+                                        FluidStack contents = properties.getContents();
+                                        if (contents == null || contents.amount < properties.getCapacity())
+                                            return true;
+                                    }
+                                    return false;
                                 })
                                 .accessibility(true, true)))
                 .bindPlayerInventory();
