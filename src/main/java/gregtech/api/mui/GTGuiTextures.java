@@ -116,7 +116,9 @@ public class GTGuiTextures {
             .name(IDs.PRIMITIVE_BACKGROUND)
             .build();
 
-    // todo clipboard backgrounds, may deserve some redoing
+    public static final UITexture CLIPBOARD_BACKGROUND = fullImage(
+            "textures/gui/base/clipboard_background.png");
+
 
     // DISPLAYS
     public static final UITexture DISPLAY = new UITexture.Builder()
@@ -234,6 +236,16 @@ public class GTGuiTextures {
     public static final UITexture[] BUTTON_MATCH_ALL = slice("textures/gui/widget/ore_filter/button_match_all.png",
             16, 32, 16, 16, ColorType.DEFAULT);
     public static final UITexture BUTTON_LOCK = fullImage("textures/gui/widget/button_lock.png");
+    public static final UITexture BUTTON_LEFT = fullImage("textures/gui/widget/left.png");
+    public static final UITexture BUTTON_RIGHT = fullImage("textures/gui/widget/right.png");
+
+    public static final UITexture[] CLIPBOARD_BUTTON = slice("textures/gui/widget/clipboard_button.png",
+            15, 60, 15, 15);
+    public static final UITexture CLIPBOARD_TEXT_BOX = UITexture.builder()
+            .location(GTValues.MODID, "textures/gui/widget/clipboard_text_box.png")
+            .imageSize(9, 18)
+            .adaptable(1)
+            .build();
 
     public static final UITexture OREDICT_ERROR = fullImage("textures/gui/widget/ore_filter/error.png");
     public static final UITexture OREDICT_INFO = fullImage("textures/gui/widget/ore_filter/info.png");

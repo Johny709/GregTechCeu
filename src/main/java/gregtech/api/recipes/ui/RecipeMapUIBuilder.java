@@ -55,10 +55,7 @@ public class RecipeMapUIBuilder {
      * @return this
      */
     public @NotNull RecipeMapUIBuilder itemSlotOverlay(@NotNull IDrawable texture, boolean isOutput) {
-        int max = getMax(false, isOutput);
-        for (int i = 0; i < max; i++) {
-            slotOverlay(texture, i, false, isOutput);
-        }
+        this.mapUI.setSlotOverlayForGroup(texture, false, isOutput);
         return this;
     }
 
@@ -80,11 +77,10 @@ public class RecipeMapUIBuilder {
     public @NotNull RecipeMapUIBuilder itemSlotOverlay(@NotNull IDrawable texture,
                                                        boolean isOutput,
                                                        boolean isLastSlot) {
-        int max = getMax(false, isOutput);
         if (isLastSlot) {
-            return slotOverlay(texture, max - 1, false, isOutput);
-        } else for (int i = 0; i < max - 1; i++) {
-            slotOverlay(texture, i, false, isOutput);
+            this.mapUI.setSlotOverlayForLastSlot(texture, false, isOutput);
+        } else {
+            this.mapUI.setSlotOverlayExceptLastSlot(texture, false, isOutput);
         }
         return this;
     }
@@ -96,10 +92,7 @@ public class RecipeMapUIBuilder {
      */
     public @NotNull RecipeMapUIBuilder fluidSlotOverlay(@NotNull IDrawable texture,
                                                         boolean isOutput) {
-        int max = getMax(true, isOutput);
-        for (int i = 0; i < max; i++) {
-            slotOverlay(texture, i, true, isOutput);
-        }
+        this.mapUI.setSlotOverlayForGroup(texture, true, isOutput);
         return this;
     }
 
@@ -122,11 +115,10 @@ public class RecipeMapUIBuilder {
     public @NotNull RecipeMapUIBuilder fluidSlotOverlay(@NotNull IDrawable texture,
                                                         boolean isOutput,
                                                         boolean isLastSlot) {
-        int max = getMax(true, isOutput);
         if (isLastSlot) {
-            return slotOverlay(texture, max - 1, true, isOutput);
-        } else for (int i = 0; i < max - 1; i++) {
-            slotOverlay(texture, i, true, isOutput);
+            this.mapUI.setSlotOverlayForLastSlot(texture, true, isOutput);
+        } else {
+            this.mapUI.setSlotOverlayExceptLastSlot(texture, true, isOutput);
         }
         return this;
     }
@@ -152,9 +144,4 @@ public class RecipeMapUIBuilder {
         return this;
     }
 
-    private int getMax(boolean isFluid, boolean isOutput) {
-        var map = mapUI.recipeMap();
-        if (isOutput) return isFluid ? map.getMaxFluidOutputs() : map.getMaxOutputs();
-        else return isFluid ? map.getMaxFluidInputs() : map.getMaxInputs();
-    }
 }

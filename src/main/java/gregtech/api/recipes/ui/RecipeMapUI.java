@@ -82,6 +82,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
     /* *********************** MUI 2 *********************** */
 
     private final Byte2ObjectMap<Int2ObjectMap<IDrawable>> overlays = new Byte2ObjectArrayMap<>(4);
+    private final Byte2ObjectMap<GroupOverlay> groupOverlays = new Byte2ObjectArrayMap<>(4);
 
     @ApiStatus.Experimental
     private boolean usesMui2 = false;
@@ -516,6 +517,10 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
         return this.overlays.computeIfAbsent(computeKey(isOutput, isFluid), k -> new Int2ObjectArrayMap<>());
     }
 
+    protected GroupOverlay getGroupOverlay(boolean isOutput, boolean isFluid) {
+        return this.groupOverlays.computeIfAbsent(computeKey(isOutput, isFluid), k -> new GroupOverlay());
+    }
+
     protected static byte computeKey(boolean isOutput, boolean isFluid) {
         byte k = 0b00;
         if (isOutput) k |= 0b10;
@@ -574,6 +579,43 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
     @ApiStatus.Internal
     public void setSlotOverlay(@NotNull IDrawable texture, int index, boolean isFluid, boolean isOutput) {
         getOverlayMap(isOutput, isFluid).put(index, texture);
+    }
+
+    /**
+     * Store an overlay for every slot of a group. The amount of slots is resolved when the ui is built, so slots
+     * added after registration, i.e. by {@link RecipeMap#setMaxInputs(int)}, are covered as well.
+     *
+     * @param texture  the texture to store
+     * @param isFluid  if the slots are fluid slots
+     * @param isOutput if the slots are output slots
+     */
+    @ApiStatus.Internal
+    public void setSlotOverlayForGroup(@NotNull IDrawable texture, boolean isFluid, boolean isOutput) {
+        getGroupOverlay(isOutput, isFluid).all = texture;
+    }
+
+    /**
+     * Store an overlay for the last slot of a group.
+     *
+     * @param texture  the texture to store
+     * @param isFluid  if the slots are fluid slots
+     * @param isOutput if the slots are output slots
+     */
+    @ApiStatus.Internal
+    public void setSlotOverlayForLastSlot(@NotNull IDrawable texture, boolean isFluid, boolean isOutput) {
+        getGroupOverlay(isOutput, isFluid).last = texture;
+    }
+
+    /**
+     * Store an overlay for every slot of a group but the last one.
+     *
+     * @param texture  the texture to store
+     * @param isFluid  if the slots are fluid slots
+     * @param isOutput if the slots are output slots
+     */
+    @ApiStatus.Internal
+    public void setSlotOverlayExceptLastSlot(@NotNull IDrawable texture, boolean isFluid, boolean isOutput) {
+        getGroupOverlay(isOutput, isFluid).allButLast = texture;
     }
 
     /**
@@ -772,6 +814,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                     .name(String.format("col:%s_item_group", isOutputs ? "output" : "input"));
             int width = grid.getItemGridWidth();
             int height = grid.getItemGridHeight();
+            int count = grid.getItemCount();
 
             SlotGroup slotGroup = new SlotGroup(isOutputs ? "output_items" : "input_items", width, 1, !isOutputs);
             for (int i = 0; i < height; i++) {
@@ -780,7 +823,11 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                         .coverChildren()
                         .name("row:item_" + i);
                 for (int j = 0; j < width; j++) {
-                    row.child(makeItemSlot(slotGroup, (i * height) + j, grid.getItemHandler(), isOutputs));
+                    int slotIndex = (i * width) + j;
+                    // the grid can hold more slots than the handler has, fill the remainder with empty cells
+                    // so the columns stay aligned
+                    row.child(slotIndex < count ? makeItemSlot(slotGroup, slotIndex, grid.getItemHandler(), isOutputs) :
+                            emptyCell());
                 }
                 col.child(row);
             }
@@ -795,6 +842,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
 
             int width = grid.getFluidGridWidth();
             int height = grid.getFluidGridHeight();
+            int count = grid.getFluidCount();
 
             for (int i = 0; i < height; i++) {
                 Flow row = Flow.row()
@@ -802,7 +850,9 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                         .coverChildren()
                         .name("row:fluid_" + i);
                 for (int j = 0; j < width; j++) {
-                    row.child(makeFluidSlot((i * height) + j, grid.getFluidHandler(), isOutputs));
+                    int slotIndex = (i * width) + j;
+                    row.child(slotIndex < count ? makeFluidSlot(slotIndex, grid.getFluidHandler(), isOutputs) :
+                            emptyCell());
                 }
                 col.child(row);
             }
@@ -853,6 +903,11 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
             return flow;
         }
 
+        /** A blank cell of slot size, used to pad grids which are larger than the amount of slots. */
+        protected IWidget emptyCell() {
+            return new Widget<>().size(18);
+        }
+
         protected ItemSlot makeItemSlot(SlotGroup group, int slotIndex, IItemHandlerModifiable itemHandler,
                                         boolean isOutputs) {
             return new ItemSlot()
@@ -860,7 +915,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                     .slot(SyncHandlers.itemSlot(itemHandler, slotIndex)
                             .slotGroup(group)
                             .accessibility(!isOutputs, true))
-                    .background(getDrawableOverlaysForSlot(isOutputs, false, slotIndex));
+                    .background(getDrawableOverlaysForSlot(isOutputs, false, slotIndex, itemHandler.getSlots()));
         }
 
         protected GTFluidSlot makeFluidSlot(int slotIndex, FluidTankList fluidHandler, boolean isOutputs) {
@@ -869,17 +924,35 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                     .syncHandler(GTFluidSlot.sync(fluidHandler.getTankAt(slotIndex))
                             .accessibility(true, !isOutputs)
                             .drawAlwaysFull(true))
-                    .background(getDrawableOverlaysForSlot(isOutputs, true, slotIndex));
+                    .background(getDrawableOverlaysForSlot(isOutputs, true, slotIndex, fluidHandler.getTanks()));
         }
 
         @ApiStatus.Experimental
-        protected IDrawable getDrawableOverlaysForSlot(boolean isOutput, boolean isFluid, int index) {
+        protected IDrawable getDrawableOverlaysForSlot(boolean isOutput, boolean isFluid, int index, int slotCount) {
             UITexture base = isFluid ? GTGuiTextures.FLUID_SLOT : GTGuiTextures.SLOT;
             Int2ObjectMap<IDrawable> overlays = getOverlayMap(isOutput, isFluid);
             if (overlays.containsKey(index)) {
                 return IDrawable.of(base, overlays.get(index));
             }
+            IDrawable overlay = getGroupOverlay(isOutput, isFluid).get(index, slotCount);
+            if (overlay != null) {
+                return IDrawable.of(base, overlay);
+            }
             return IDrawable.of(base);
+        }
+    }
+
+    /** Overlays which apply to a whole group of slots, resolved against the actual amount of slots. */
+    protected static class GroupOverlay {
+
+        private @Nullable IDrawable all;
+        private @Nullable IDrawable allButLast;
+        private @Nullable IDrawable last;
+
+        public @Nullable IDrawable get(int index, int slotCount) {
+            if (this.last != null && index == slotCount - 1) return this.last;
+            if (this.allButLast != null && index < slotCount - 1) return this.allButLast;
+            return this.all;
         }
     }
 

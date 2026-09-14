@@ -49,7 +49,11 @@ public class FilteredItemHandler extends GTItemStackHandler {
 
     @Override
     public void setStackInSlot(int slot, @NotNull ItemStack stack) {
-        if (!isItemValid(slot, stack)) return;
+        // an empty stack must always be accepted, otherwise the slot can never be cleared.
+        // the client clears slots this way when the container syncs, and a filter that tests for
+        // a capability (ItemStack#hasCapability is always false for an empty stack) would reject it,
+        // leaving a ghost item in the slot which can be shift clicked out over and over again
+        if (!stack.isEmpty() && !isItemValid(slot, stack)) return;
         super.setStackInSlot(slot, stack);
     }
 

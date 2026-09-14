@@ -217,7 +217,8 @@ public class MetaTileEntityWorkbench extends MetaTileEntity implements IMetaTile
     @Override
     public @NotNull ModularPanel buildUI(MetaTileEntityGuiData guiData, PanelSyncManager syncManager,
                                          UISettings settings) {
-        getCraftingRecipeLogic().updateCurrentRecipe();
+        getCraftingRecipeLogic().updateInventory(getAvailableHandlers());
+        this.recipeLogic.updateCurrentRecipe();
         this.recipeLogic.clearSlotMap();
 
         syncManager.syncValue("recipe_logic", this.recipeLogic);

@@ -31,6 +31,7 @@ public class GTGuiTheme {
         public static final int BRONZE = 0xFF7706;
         public static final int STEEL = 0x57576A;
         public static final int PRIMITIVE = 0x826B51;
+        public static final int CLIPBOARD_TEXT = 0x1E1E1E;
     }
 
     public static class Names {
@@ -40,6 +41,7 @@ public class GTGuiTheme {
         public static final String BRONZE = gregtech("bronze");
         public static final String STEEL = gregtech("steel");
         public static final String PRIMITIVE = gregtech("primitive");
+        public static final String CLIPBOARD = gregtech("clipboard");
 
         private static String gregtech(String s) {
             return "gregtech:" + s;
@@ -101,6 +103,15 @@ public class GTGuiTheme {
             .textColor(Color.WHITE.darker(1))
             .color(Colors.PRIMITIVE)
             .itemSlot(GTGuiTextures.IDs.PRIMITIVE_SLOT)
+            .build();
+
+    /**
+     * Draws no backgrounds at all, so that only the paper textures the clipboard sets on its own widgets are
+     * visible.
+     */
+    public static final GTGuiTheme CLIPBOARD = templateBuilder(Names.CLIPBOARD)
+            .noBackgrounds()
+            .textColor(Colors.CLIPBOARD_TEXT)
             .build();
 
     // TODO make this better
@@ -239,6 +250,28 @@ public class GTGuiTheme {
         public Builder textShadow() {
             theme.elementBuilder.add(b -> b.add("textShadow", true));
             return this;
+        }
+
+        /**
+         * Removes every background this theme would draw on its own, including the ones drawn while hovering a
+         * widget. Use for UIs that draw all of their own textures, since a widget cannot opt out of the hover
+         * background of its theme by itself.
+         */
+        public Builder noBackgrounds() {
+            theme.elementBuilder.add(b -> b
+                    .add("background", "none")
+                    .add("panel", noBackground())
+                    .add("panel:hover", noBackground())
+                    .add("button", noBackground())
+                    .add("button:hover", noBackground())
+                    .add("textField", noBackground())
+                    .add("textField:hover", noBackground()));
+            return this;
+        }
+
+        /** Note that the hovered variant of a widget theme is a separate entry, suffixed with {@code :hover}. */
+        private static JsonBuilder noBackground() {
+            return new JsonBuilder().add("background", "none");
         }
 
         /**
