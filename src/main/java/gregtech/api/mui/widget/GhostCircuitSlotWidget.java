@@ -120,18 +120,23 @@ public class GhostCircuitSlotWidget extends Widget<GhostCircuitSlotWidget> imple
                                 .background(GTGuiTextures.SLOT, GTGuiTextures.INT_CIRCUIT_OVERLAY))
                         .child(new Grid()
                                 .left(7).right(7).top(41).height(4 * 18)
-                                .mapTo(9, 33, value -> new ButtonWidget<>()
-                                        .size(18)
-                                        .background(GTGuiTextures.SLOT, new ItemDrawable(
-                                                IntCircuitIngredient.getIntegratedCircuit(value)).asIcon())
-                                        .disableHoverBackground()
-                                        .onMousePressed(mouseButton -> {
-                                            getSyncHandler().syncToServer(SYNC_CIRCUIT_INDEX,
-                                                    buf -> buf.writeShort(value));
-                                            circuitPreview.setItem(IntCircuitIngredient.getIntegratedCircuit(value));
-                                            if (Interactable.hasShiftDown()) this.selectorPanel.closePanel();
-                                            return true;
-                                        }))
+                                .gridOfWidthHeight(9, 4, (col, row, value) -> {
+                                    // the grid is 9x4 = 36 cells, but only 0..CIRCUIT_MAX are valid circuits
+                                    if (value > IntCircuitIngredient.CIRCUIT_MAX) return null;
+                                    return new ButtonWidget<>()
+                                            .size(18)
+                                            .background(GTGuiTextures.SLOT, new ItemDrawable(
+                                                    IntCircuitIngredient.getIntegratedCircuit(value)).asIcon())
+                                            .disableHoverBackground()
+                                            .onMousePressed(mouseButton -> {
+                                                getSyncHandler().syncToServer(SYNC_CIRCUIT_INDEX,
+                                                        buf -> buf.writeShort(value));
+                                                circuitPreview
+                                                        .setItem(IntCircuitIngredient.getIntegratedCircuit(value));
+                                                if (Interactable.hasShiftDown()) this.selectorPanel.closePanel();
+                                                return true;
+                                            });
+                                })
                                 .minColWidth(18).minRowHeight(18)
                                 .minElementMargin(0, 0));
             }, true);
