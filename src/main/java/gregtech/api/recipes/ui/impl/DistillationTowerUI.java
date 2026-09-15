@@ -17,7 +17,6 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 
 import com.cleanroommc.modularui.api.drawable.IDrawable;
 import com.cleanroommc.modularui.screen.ModularPanel;
-import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
 import com.cleanroommc.modularui.widgets.ProgressWidget.Direction;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
 import org.jetbrains.annotations.NotNull;
@@ -81,8 +80,8 @@ public class DistillationTowerUI<R extends RecipeMap<?>> extends RecipeMapUI<R> 
                 .recipeMap(recipeMap())
                 .pos(47, 8)
                 .size(66, 58)
-                .value(new DoubleSyncValue(layout.progress()))
-                .texture(GTGuiTextures.PROGRESS_BAR_DISTILLATION_TOWER, -1)
+                .value(viewerProgress(layout.progress()))
+                .texture(GTGuiTextures.PROGRESS_BAR_DISTILLATION_TOWER, 66)
                 .direction(Direction.RIGHT));
 
         panel.child(builder.makeFluidSlot(0, layout.importFluids(), false)

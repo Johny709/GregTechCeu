@@ -13,7 +13,6 @@ import gregtech.api.recipes.ui.RecipeMapUI;
 import net.minecraftforge.items.IItemHandlerModifiable;
 
 import com.cleanroommc.modularui.screen.ModularPanel;
-import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
 import com.cleanroommc.modularui.widgets.ProgressWidget.Direction;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
 import org.jetbrains.annotations.ApiStatus;
@@ -46,8 +45,8 @@ public class CokeOvenUI<R extends RecipeMap<?>> extends RecipeMapUI<R> {
                 .recipeMap(recipeMap())
                 .pos(70, 19)
                 .size(36, 18)
-                .value(new DoubleSyncValue(layout.progress()))
-                .texture(GTGuiTextures.PROGRESS_BAR_COKE_OVEN, -1)
+                .value(viewerProgress(layout.progress()))
+                .texture(GTGuiTextures.PROGRESS_BAR_COKE_OVEN, 36)
                 .direction(Direction.RIGHT));
 
         panel.child(builder.makeItemSlot(new SlotGroup("input_items", 1, 1, true), 0, layout.importItems(), false)

@@ -1,10 +1,12 @@
 package gregtech.api.recipes.ui;
 
 import com.cleanroommc.modularui.api.drawable.IDrawable;
+import com.cleanroommc.modularui.api.value.IDoubleValue;
 import com.cleanroommc.modularui.api.widget.IWidget;
 import com.cleanroommc.modularui.drawable.UITexture;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.utils.Alignment;
+import com.cleanroommc.modularui.value.DoubleValue;
 import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
 import com.cleanroommc.modularui.value.sync.SyncHandlers;
 import com.cleanroommc.modularui.widget.Widget;
@@ -538,7 +540,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                 .setOutputs(layout.exportItems(), layout.exportFluids())
                 .slotListener(layout.slotListener())
                 .inventorySlotGroups()
-                .progressWidget(layout.progress()));
+                .progressWidget(viewerProgress(layout.progress())));
     }
 
     /**
@@ -562,6 +564,19 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
             double value = progress.getAsDouble();
             return value >= split ? (value - split) / (1d - split) : 0d;
         };
+    }
+
+    /**
+     * The value a progress bar in the recipe viewer runs off: a plain client-side value, read afresh on every frame.
+     * <p>
+     * A {@link DoubleSyncValue} is wrong here, even though that is what a machine's bar uses. Its
+     * {@code getDoubleValue} returns a cache which is only refreshed from the supplier by
+     * {@code PanelSyncManager#detectAndSendChanges}, driven by the container on the server - and the viewer's panel is
+     * detached, client-only and has no sync manager at all. The cache would therefore keep the value the supplier
+     * happened to return while the panel was being built, and the bar would sit at that fill forever.
+     */
+    protected static IDoubleValue<?> viewerProgress(@NotNull DoubleSupplier progress) {
+        return new DoubleValue.Dynamic(progress, null);
     }
 
     protected Int2ObjectMap<IDrawable> getOverlayMap(boolean isOutput, boolean isFluid) {
@@ -770,6 +785,15 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
 
         public PanelBuilder progressWidget(@NotNull DoubleSupplier supplier,
                                            @Nullable Consumer<RecipeProgressWidget> consumer) {
+            return progressWidget(new DoubleSyncValue(supplier), consumer);
+        }
+
+        public PanelBuilder progressWidget(@NotNull IDoubleValue<?> value) {
+            return progressWidget(value, null);
+        }
+
+        public PanelBuilder progressWidget(@NotNull IDoubleValue<?> value,
+                                           @Nullable Consumer<RecipeProgressWidget> consumer) {
             RecipeProgressWidget progressWidget = new RecipeProgressWidget();
             if (extraOverlays != null) {
                 extraOverlays.accept(progressWidget);
@@ -777,13 +801,17 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
             if (consumer != null) consumer.accept(progressWidget);
             int progressSize = 20;
             int margin = 6;
+            // the bar's length is passed to texture() rather than left to the widget: a ProgressWidget works its own
+            // size out on the first onResized, which MUI2 fires while the widget initialises and its area is still
+            // empty, and it never revisits that - a zero length makes the fill quantisation divide by zero and the
+            // filled half of the bar is then never drawn at all
             inventoryRow[1] = progressWidget
                     .recipeMap(recipeMap)
                     .name(RECIPE_PROGRESS)
                     .size(progressSize)
                     .margin(margin, 0)
-                    .value(new DoubleSyncValue(supplier))
-                    .texture(progressTexture, -1)
+                    .value(value)
+                    .texture(progressTexture, progressSize)
                     .direction(progressDirection);
             return this;
         }

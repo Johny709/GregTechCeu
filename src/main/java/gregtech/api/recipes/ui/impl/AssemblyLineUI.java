@@ -14,7 +14,6 @@ import gregtech.api.recipes.ui.RecipeMapUI;
 import net.minecraftforge.items.IItemHandlerModifiable;
 
 import com.cleanroommc.modularui.screen.ModularPanel;
-import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
 import com.cleanroommc.modularui.widgets.ProgressWidget.Direction;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
 import org.jetbrains.annotations.ApiStatus;
@@ -68,15 +67,15 @@ public final class AssemblyLineUI<R extends RecipeMap<?>> extends RecipeMapUI<R>
                 .recipeMap(recipeMap())
                 .pos(80, 1)
                 .size(54, 72)
-                .value(new DoubleSyncValue(layout.progress()))
-                .texture(GTGuiTextures.PROGRESS_BAR_ASSEMBLY_LINE, -1)
+                .value(viewerProgress(layout.progress()))
+                .texture(GTGuiTextures.PROGRESS_BAR_ASSEMBLY_LINE, 54)
                 .direction(Direction.RIGHT));
         panel.child(new RecipeProgressWidget()
                 .recipeMap(recipeMap())
                 .pos(138, 19)
                 .size(10, 18)
-                .value(new DoubleSyncValue(layout.progress()))
-                .texture(GTGuiTextures.PROGRESS_BAR_ASSEMBLY_LINE_ARROW, -1)
+                .value(viewerProgress(layout.progress()))
+                .texture(GTGuiTextures.PROGRESS_BAR_ASSEMBLY_LINE_ARROW, 18)
                 .direction(Direction.UP));
 
         // the research data stick, which the recipe viewer fills from the recipe's research property

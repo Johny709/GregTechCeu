@@ -17,7 +17,6 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 
 import org.apache.commons.lang3.tuple.Pair;
 import com.cleanroommc.modularui.screen.ModularPanel;
-import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
 import com.cleanroommc.modularui.widget.Widget;
 import com.cleanroommc.modularui.widgets.ProgressWidget.Direction;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
@@ -63,15 +62,15 @@ public class ResearchStationUI<R extends RecipeMap<?>> extends RecipeMapUI<R> {
                 .recipeMap(recipeMap())
                 .pos(72, 28)
                 .size(54, 5)
-                .value(new DoubleSyncValue(progressUpTo(layout.progress(), SPLIT)))
-                .texture(GTGuiTextures.PROGRESS_BAR_RESEARCH_STATION_1, -1)
+                .value(viewerProgress(progressUpTo(layout.progress(), SPLIT)))
+                .texture(GTGuiTextures.PROGRESS_BAR_RESEARCH_STATION_1, 54)
                 .direction(Direction.RIGHT));
         panel.child(new RecipeProgressWidget()
                 .recipeMap(recipeMap())
                 .pos(119, 32)
                 .size(10, 18)
-                .value(new DoubleSyncValue(progressAfter(layout.progress(), SPLIT)))
-                .texture(GTGuiTextures.PROGRESS_BAR_RESEARCH_STATION_2, -1)
+                .value(viewerProgress(progressAfter(layout.progress(), SPLIT)))
+                .texture(GTGuiTextures.PROGRESS_BAR_RESEARCH_STATION_2, 18)
                 .direction(Direction.DOWN));
 
         panel.child(builder.makeItemSlot(inputs, 1, layout.importItems(), false)

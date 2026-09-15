@@ -15,7 +15,6 @@ import net.minecraftforge.items.IItemHandlerModifiable;
 
 import org.apache.commons.lang3.tuple.Pair;
 import com.cleanroommc.modularui.screen.ModularPanel;
-import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
 import com.cleanroommc.modularui.widgets.ProgressWidget.Direction;
 import com.cleanroommc.modularui.widgets.slot.SlotGroup;
 import org.jetbrains.annotations.ApiStatus;
@@ -58,15 +57,15 @@ public class CrackerUnitUI<R extends RecipeMap<?>> extends RecipeMapUI<R> {
                 .recipeMap(recipeMap())
                 .pos(42, 42)
                 .size(21, 19)
-                .value(new DoubleSyncValue(progressUpTo(layout.progress(), SPLIT)))
-                .texture(GTGuiTextures.PROGRESS_BAR_CRACKING_INPUT, -1)
+                .value(viewerProgress(progressUpTo(layout.progress(), SPLIT)))
+                .texture(GTGuiTextures.PROGRESS_BAR_CRACKING_INPUT, 19)
                 .direction(Direction.UP));
         panel.child(new gregtech.api.mui.widget.RecipeProgressWidget()
                 .recipeMap(recipeMap())
                 .pos(78, 23)
                 .size(20, 20)
-                .value(new DoubleSyncValue(progressAfter(layout.progress(), SPLIT)))
-                .texture(GTGuiTextures.PROGRESS_BAR_CRACKING, -1)
+                .value(viewerProgress(progressAfter(layout.progress(), SPLIT)))
+                .texture(GTGuiTextures.PROGRESS_BAR_CRACKING, 20)
                 .direction(Direction.RIGHT));
 
         // the circuit which picks the cracking type
