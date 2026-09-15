@@ -513,6 +513,57 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
         return builderFunction.apply(new PanelBuilder()).build(mte);
     }
 
+    /**
+     * Builds the same layout as {@link #constructPanel}, but detached from any machine. Used by the recipe viewer,
+     * which shows a recipe map without an owning {@link MetaTileEntity}.
+     *
+     * @param name the panel name, which has to be unique per recipe map
+     */
+    public ModularPanel constructStandalonePanel(String name, UnaryOperator<PanelBuilder> builderFunction) {
+        return builderFunction.apply(new PanelBuilder()).build(name);
+    }
+
+    /**
+     * Builds the layout the recipe viewer shows for this recipe map. The default is the grid a machine would get,
+     * which is right for a recipe map whose slots are only ever a block of inputs and a block of outputs. A subclass
+     * whose layout is its own - the assembly line's data slot sits outside the input grid, the coke oven has its own
+     * geometry entirely - overrides this, the way it used to override {@code createJeiUITemplate} for MUI1.
+     *
+     * @param name   the panel name, which has to be unique per recipe map
+     * @param layout the inventories the slots are placed over, and what to do with the slots once made
+     */
+    public ModularPanel constructRecipeViewerPanel(@NotNull String name, @NotNull RecipeViewerLayout layout) {
+        return constructStandalonePanel(name, builder -> builder
+                .setInputs(layout.importItems(), layout.importFluids())
+                .setOutputs(layout.exportItems(), layout.exportFluids())
+                .slotListener(layout.slotListener())
+                .inventorySlotGroups()
+                .progressWidget(layout.progress()));
+    }
+
+    /**
+     * The leading half of a recipe, for the first of two chained progress bars: it fills up to {@code split} and then
+     * stays full while the second bar runs. Together with {@link #progressAfter} this replaces the MUI1
+     * {@code GTUtility#createPairedSupplier}, which shared a tracker between the two bars and so depended on their
+     * being drawn in order.
+     *
+     * @param split how far into the recipe the first bar hands over, 0 ~ 1
+     */
+    protected static DoubleSupplier progressUpTo(DoubleSupplier progress, double split) {
+        return () -> {
+            double value = progress.getAsDouble();
+            return value >= split ? 1d : value / split;
+        };
+    }
+
+    /** The trailing half: empty until the first bar is full, then filling over what is left. */
+    protected static DoubleSupplier progressAfter(DoubleSupplier progress, double split) {
+        return () -> {
+            double value = progress.getAsDouble();
+            return value >= split ? (value - split) / (1d - split) : 0d;
+        };
+    }
+
     protected Int2ObjectMap<IDrawable> getOverlayMap(boolean isOutput, boolean isFluid) {
         return this.overlays.computeIfAbsent(computeKey(isOutput, isFluid), k -> new Int2ObjectArrayMap<>());
     }
@@ -674,6 +725,8 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
         private @NotNull CalculatedGrid inputs = CalculatedGrid.EMPTY;
         private @NotNull CalculatedGrid outputs = CalculatedGrid.EMPTY;
         private BiConsumer<ModularPanel, @NotNull Integer> extraWidgets;
+        private @Nullable SlotListener slotListener;
+        private boolean slotsCreated = false;
         // should this be initialized to an sized empty widget?
         private final IWidget[] inventoryRow = new IWidget[3]; // input, progress, output,
         private boolean calculateOffset = false;
@@ -736,6 +789,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
         }
 
         public PanelBuilder inventorySlotGroups() {
+            this.slotsCreated = true;
             if (inputs.getItemCount() > 0 || inputs.getFluidCount() > 0) {
                 inventoryRow[0] = makeInventorySlotGroup(inputs, false);
             }
@@ -750,7 +804,28 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
             return this;
         }
 
+        /**
+         * Called for every slot this builder creates, so a caller that needs to know where the slots ended up - the
+         * recipe viewer, which has to hand those positions to JEI - can keep hold of them. Set it before
+         * {@link #inventorySlotGroups()}, which is what creates the slots.
+         */
+        public PanelBuilder slotListener(@Nullable SlotListener listener) {
+            if (this.slotsCreated) {
+                throw new IllegalStateException("The slot listener must be set before the slots are created!");
+            }
+            this.slotListener = listener;
+            return this;
+        }
+
         public ModularPanel build(MetaTileEntity mte) {
+            return build((w, h) -> GTGuis.createPanel(mte, w, h));
+        }
+
+        public ModularPanel build(String name) {
+            return build((w, h) -> GTGuis.createPanel(name, w, h));
+        }
+
+        private ModularPanel build(PanelFactory panelFactory) {
             int yOffset;
             if (calculateOffset && isOversized()) {
                 yOffset = 9; // font height
@@ -761,7 +836,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
             int inputHeight = inputs.getMaxHeight();
             int outputHeight = outputs.getMaxHeight();
 
-            ModularPanel panel = GTGuis.createPanel(mte, this.width, adjustHeight(inputHeight, outputHeight) + yOffset);
+            ModularPanel panel = panelFactory.create(this.width, adjustHeight(inputHeight, outputHeight) + yOffset);
 
             if (extraWidgets != null) extraWidgets.accept(panel, yOffset);
 
@@ -908,23 +983,27 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
             return new Widget<>().size(18);
         }
 
-        protected ItemSlot makeItemSlot(SlotGroup group, int slotIndex, IItemHandlerModifiable itemHandler,
-                                        boolean isOutputs) {
-            return new ItemSlot()
+        public ItemSlot makeItemSlot(SlotGroup group, int slotIndex, IItemHandlerModifiable itemHandler,
+                                    boolean isOutputs) {
+            ItemSlot slot = new ItemSlot()
                     .name("item.slot." + slotIndex + ":" + group.getName())
                     .slot(SyncHandlers.itemSlot(itemHandler, slotIndex)
                             .slotGroup(group)
                             .accessibility(!isOutputs, true))
                     .background(getDrawableOverlaysForSlot(isOutputs, false, slotIndex, itemHandler.getSlots()));
+            if (this.slotListener != null) this.slotListener.onSlot(slot, false, isOutputs, slotIndex);
+            return slot;
         }
 
-        protected GTFluidSlot makeFluidSlot(int slotIndex, FluidTankList fluidHandler, boolean isOutputs) {
-            return new GTFluidSlot()
+        public GTFluidSlot makeFluidSlot(int slotIndex, FluidTankList fluidHandler, boolean isOutputs) {
+            GTFluidSlot slot = new GTFluidSlot()
                     .name("fluid.slot." + slotIndex)
                     .syncHandler(GTFluidSlot.sync(fluidHandler.getTankAt(slotIndex))
                             .accessibility(true, !isOutputs)
                             .drawAlwaysFull(true))
                     .background(getDrawableOverlaysForSlot(isOutputs, true, slotIndex, fluidHandler.getTanks()));
+            if (this.slotListener != null) this.slotListener.onSlot(slot, true, isOutputs, slotIndex);
+            return slot;
         }
 
         @ApiStatus.Experimental
@@ -939,6 +1018,69 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                 return IDrawable.of(base, overlay);
             }
             return IDrawable.of(base);
+        }
+    }
+
+    /** Creates the panel a {@link PanelBuilder} fills, so the same layout can be built with or without a machine. */
+    @FunctionalInterface
+    public interface PanelFactory {
+
+        ModularPanel create(int width, int height);
+    }
+
+    /** Receives every slot a {@link PanelBuilder} creates, in the order they are created. */
+    @FunctionalInterface
+    public interface SlotListener {
+
+        void onSlot(IWidget slot, boolean isFluid, boolean isOutput, int index);
+    }
+
+    /**
+     * What a recipe viewer hands {@link #constructRecipeViewerPanel} to have a recipe map laid out: the empty
+     * inventories the slots are placed over, the progress bar's animation, and the listener which collects the slots
+     * as they are made, since the viewer draws the ingredients itself and needs to know where they ended up.
+     */
+    public static final class RecipeViewerLayout {
+
+        private final IItemHandlerModifiable importItems, exportItems;
+        private final FluidTankList importFluids, exportFluids;
+        private final DoubleSupplier progress;
+        private final SlotListener slotListener;
+
+        public RecipeViewerLayout(@NotNull IItemHandlerModifiable importItems,
+                                  @NotNull IItemHandlerModifiable exportItems,
+                                  @NotNull FluidTankList importFluids, @NotNull FluidTankList exportFluids,
+                                  @NotNull DoubleSupplier progress, @NotNull SlotListener slotListener) {
+            this.importItems = importItems;
+            this.exportItems = exportItems;
+            this.importFluids = importFluids;
+            this.exportFluids = exportFluids;
+            this.progress = progress;
+            this.slotListener = slotListener;
+        }
+
+        public IItemHandlerModifiable importItems() {
+            return this.importItems;
+        }
+
+        public IItemHandlerModifiable exportItems() {
+            return this.exportItems;
+        }
+
+        public FluidTankList importFluids() {
+            return this.importFluids;
+        }
+
+        public FluidTankList exportFluids() {
+            return this.exportFluids;
+        }
+
+        public DoubleSupplier progress() {
+            return this.progress;
+        }
+
+        public SlotListener slotListener() {
+            return this.slotListener;
         }
     }
 

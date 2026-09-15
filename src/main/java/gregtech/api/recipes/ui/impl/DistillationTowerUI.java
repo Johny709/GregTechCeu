@@ -7,14 +7,34 @@ import gregtech.api.gui.resources.TextureArea;
 import gregtech.api.gui.widgets.ProgressWidget;
 import gregtech.api.gui.widgets.SlotWidget;
 import gregtech.api.gui.widgets.TankWidget;
+import gregtech.api.mui.GTGuiTextures;
+import gregtech.api.mui.GTGuis;
+import gregtech.api.mui.widget.RecipeProgressWidget;
 import gregtech.api.recipes.RecipeMap;
 import gregtech.api.recipes.ui.RecipeMapUI;
 
 import net.minecraftforge.items.IItemHandlerModifiable;
 
+import com.cleanroommc.modularui.api.drawable.IDrawable;
+import com.cleanroommc.modularui.screen.ModularPanel;
+import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
+import com.cleanroommc.modularui.widgets.ProgressWidget.Direction;
+import com.cleanroommc.modularui.widgets.slot.SlotGroup;
 import org.jetbrains.annotations.NotNull;
 
 public class DistillationTowerUI<R extends RecipeMap<?>> extends RecipeMapUI<R> {
+
+    /** The layout is drawn at fixed coordinates, so the panel is the size the layout was drawn for. */
+    private static final int PANEL_WIDTH = 176, PANEL_HEIGHT = 175;
+    /** The one fluid input, off to the left of the tower. */
+    private static final int INPUT_X = 40, INPUT_Y = 37;
+    /** The item output - the tower's residue - which sits beside the bottom row of fluid outputs. */
+    private static final int ITEM_OUTPUT_X = 94, ITEM_OUTPUT_Y = 55;
+    /** Fluid outputs fill three to a row, bottom row first, the way the tower's plates stack upwards. */
+    private static final int FLUID_OUTPUT_X = 113, FLUID_OUTPUT_Y = 55, FLUIDS_PER_ROW = 3;
+    /** One beaker per column, so a fluid keeps its beaker however many rows the outputs end up filling. */
+    private static final IDrawable[] BEAKERS = { GTGuiTextures.BEAKER_OVERLAY_2, GTGuiTextures.BEAKER_OVERLAY_3,
+            GTGuiTextures.BEAKER_OVERLAY_4 };
 
     public DistillationTowerUI(@NotNull R recipeMap) {
         super(recipeMap, true, true, true, false, false);
@@ -46,6 +66,40 @@ public class DistillationTowerUI<R extends RecipeMap<?>> extends RecipeMapUI<R> 
 
             builder.widget(slotWidget);
         }
+    }
+
+    /**
+     * The tower boils one fluid apart into a column of up to twelve, which is nothing like the input block / output
+     * block grid the default layout builds. This is the MUI1 {@link #createJeiUITemplate} layout, widget for widget.
+     */
+    @Override
+    public ModularPanel constructRecipeViewerPanel(@NotNull String name, @NotNull RecipeViewerLayout layout) {
+        PanelBuilder builder = new PanelBuilder().slotListener(layout.slotListener());
+        ModularPanel panel = GTGuis.createPanel(name, PANEL_WIDTH, PANEL_HEIGHT);
+
+        panel.child(new RecipeProgressWidget()
+                .recipeMap(recipeMap())
+                .pos(47, 8)
+                .size(66, 58)
+                .value(new DoubleSyncValue(layout.progress()))
+                .texture(GTGuiTextures.PROGRESS_BAR_DISTILLATION_TOWER, -1)
+                .direction(Direction.RIGHT));
+
+        panel.child(builder.makeFluidSlot(0, layout.importFluids(), false)
+                .overlay(GTGuiTextures.BEAKER_OVERLAY_1)
+                .pos(INPUT_X, INPUT_Y));
+
+        panel.child(builder.makeItemSlot(new SlotGroup("output_items", 1, 1, false), 0, layout.exportItems(), true)
+                .overlay(GTGuiTextures.DUST_OVERLAY)
+                .pos(ITEM_OUTPUT_X, ITEM_OUTPUT_Y));
+
+        for (int i = 0; i < layout.exportFluids().getTanks(); i++) {
+            panel.child(builder.makeFluidSlot(i, layout.exportFluids(), true)
+                    .overlay(BEAKERS[i % FLUIDS_PER_ROW])
+                    .pos(FLUID_OUTPUT_X + 18 * (i % FLUIDS_PER_ROW),
+                            FLUID_OUTPUT_Y - 18 * (i / FLUIDS_PER_ROW)));
+        }
+        return panel;
     }
 
     @Override
