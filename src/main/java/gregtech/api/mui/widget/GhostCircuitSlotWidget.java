@@ -120,23 +120,18 @@ public class GhostCircuitSlotWidget extends Widget<GhostCircuitSlotWidget> imple
                                 .background(GTGuiTextures.SLOT, GTGuiTextures.INT_CIRCUIT_OVERLAY))
                         .child(new Grid()
                                 .left(7).right(7).top(41).height(4 * 18)
-                                .gridOfWidthHeight(9, 4, (col, row, value) -> {
-                                    // the grid is 9x4 = 36 cells, but only 0..CIRCUIT_MAX are valid circuits
-                                    if (value > IntCircuitIngredient.CIRCUIT_MAX) return null;
-                                    return new ButtonWidget<>()
-                                            .size(18)
-                                            .background(GTGuiTextures.SLOT, new ItemDrawable(
-                                                    IntCircuitIngredient.getIntegratedCircuit(value)).asIcon())
-                                            .disableHoverBackground()
-                                            .onMousePressed(mouseButton -> {
-                                                getSyncHandler().syncToServer(SYNC_CIRCUIT_INDEX,
-                                                        buf -> buf.writeShort(value));
-                                                circuitPreview
-                                                        .setItem(IntCircuitIngredient.getIntegratedCircuit(value));
-                                                if (Interactable.hasShiftDown()) this.selectorPanel.closePanel();
-                                                return true;
-                                            });
-                                })
+                                .gridOfSizeWidth(32, 9, (x, y, i) -> i > 32 ? new Widget<>() : new ButtonWidget<>()
+                                        .size(18)
+                                        .background(GTGuiTextures.SLOT, new ItemDrawable(
+                                                IntCircuitIngredient.getIntegratedCircuit(i)).asIcon())
+                                        .disableHoverBackground()
+                                        .onMousePressed(mouseButton -> {
+                                            getSyncHandler().syncToServer(SYNC_CIRCUIT_INDEX,
+                                                    buf -> buf.writeShort(i));
+                                            circuitPreview.setItem(IntCircuitIngredient.getIntegratedCircuit(i));
+                                            if (Interactable.hasShiftDown()) this.selectorPanel.closePanel();
+                                            return true;
+                                        }))
                                 .minColWidth(18).minRowHeight(18)
                                 .minElementMargin(0, 0));
             }, true);
@@ -224,15 +219,15 @@ public class GhostCircuitSlotWidget extends Widget<GhostCircuitSlotWidget> imple
         private int getNextCircuitValue(int delta) {
             GhostCircuitItemStackHandler handler = getGhostCircuitHandler();
 
-            // if no circuit, skip 0 and return 32 if decrementing,
-            // or, skip 0 and return 1 when incrementing
+            // if no circuit, return 32 if decrementing,
+            // or, return 0 when incrementing
             if (!handler.hasCircuitValue()) {
-                return delta == 1 ? 1 : IntCircuitIngredient.CIRCUIT_MAX;
+                return delta == 1 ? 0 : IntCircuitIngredient.CIRCUIT_MAX;
                 // if at max, loop around to no circuit
             } else if (handler.getCircuitValue() + delta > IntCircuitIngredient.CIRCUIT_MAX) {
                 return GhostCircuitItemStackHandler.NO_CONFIG;
-                // if at 1, skip 0 and return to no circuit
-            } else if (handler.getCircuitValue() + delta < 1) {
+                // if at 0, return to no circuit
+            } else if (handler.getCircuitValue() + delta < 0) {
                 return GhostCircuitItemStackHandler.NO_CONFIG;
             }
 

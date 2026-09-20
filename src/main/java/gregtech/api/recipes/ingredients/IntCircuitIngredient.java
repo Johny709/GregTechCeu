@@ -125,8 +125,10 @@ public class IntCircuitIngredient extends GTRecipeInput {
     public static void setCircuitConfiguration(@NotNull ItemStack itemStack, int configuration) {
         if (!MetaItems.INTEGRATED_CIRCUIT.isItemEqual(itemStack))
             throw new IllegalArgumentException("Given item stack is not an integrated circuit!");
-        if (configuration < 0 || configuration > CIRCUIT_MAX)
-            throw new IllegalArgumentException("Given configuration number is out of range!");
+        if (configuration < CIRCUIT_MIN)
+            throw new IllegalArgumentException("Given configuration number is below the minimum range!");
+        if (configuration > CIRCUIT_MAX)
+            throw new IllegalArgumentException("Given configuration number is above the maximum range!");
         NBTTagCompound tagCompound = GTUtility.getOrCreateNbtCompound(itemStack);
         tagCompound.setInteger("Configuration", configuration);
     }
