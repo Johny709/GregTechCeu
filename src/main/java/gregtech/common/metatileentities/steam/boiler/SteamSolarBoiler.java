@@ -59,7 +59,7 @@ public class SteamSolarBoiler extends SteamBoiler {
                         .size(20)
                         .texture(isHighPressure ?
                                 GTGuiTextures.PROGRESS_BAR_SOLAR_STEEL :
-                                GTGuiTextures.PROGRESS_BAR_SOLAR_BRONZE, -1));
+                                GTGuiTextures.PROGRESS_BAR_SOLAR_BRONZE, 20));
     }
 
     @SideOnly(Side.CLIENT)

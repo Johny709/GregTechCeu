@@ -113,7 +113,7 @@ public class MetaTileEntityCokeOven extends RecipeMapPrimitiveMultiblockControll
                                             .singletonSlotGroup())
                                     .pos(52, 30))
                             .child(new ProgressWidget()
-                                    .texture(GTGuiTextures.PRIMITIVE_BLAST_FURNACE_PROGRESS_BAR, -1)
+                                    .texture(GTGuiTextures.PRIMITIVE_BLAST_FURNACE_PROGRESS_BAR, 20)
                                     .size(20, 15)
                                     .pos(76, 32)
                                     .value(new DoubleSyncValue(recipeMapWorkable::getProgressPercent)))

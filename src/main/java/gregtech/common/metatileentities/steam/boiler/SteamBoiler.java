@@ -348,7 +348,7 @@ public abstract class SteamBoiler extends MetaTileEntity implements IDataInfoPro
         return GTGuis.defaultPanel(this)
                 .child(IKey.lang(getMetaFullName()).asWidget().pos(5, 5))
                 .child(new ProgressWidget()
-                        .texture(getEmptyBarDrawable(), GTGuiTextures.PROGRESS_BAR_BOILER_HEAT, -1)
+                        .texture(getEmptyBarDrawable(), GTGuiTextures.PROGRESS_BAR_BOILER_HEAT, 54)
                         .direction(ProgressWidget.Direction.UP)
                         .name("temp")
                         .tooltipBuilder(

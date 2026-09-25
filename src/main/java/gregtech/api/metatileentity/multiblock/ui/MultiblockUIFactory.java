@@ -332,7 +332,7 @@ public class MultiblockUIFactory {
                 if (i < barBuilders.size()) {
                     widget = barBuilders.get(i)
                             .apply(new TemplateBarBuilder())
-                            .build();
+                            .build(barWidth);
                 } else {
                     widget = new ProgressWidget()
                             .addTooltipLine("Error! no bar for index: " + i)

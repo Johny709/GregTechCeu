@@ -42,6 +42,7 @@ public class GTGuiTheme {
         public static final String STEEL = gregtech("steel");
         public static final String PRIMITIVE = gregtech("primitive");
         public static final String CLIPBOARD = gregtech("clipboard");
+        public static final String RECIPE_VIEWER = gregtech("recipe_viewer");
 
         private static String gregtech(String s) {
             return "gregtech:" + s;
@@ -112,6 +113,16 @@ public class GTGuiTheme {
     public static final GTGuiTheme CLIPBOARD = templateBuilder(Names.CLIPBOARD)
             .noBackgrounds()
             .textColor(Colors.CLIPBOARD_TEXT)
+            .build();
+
+    /**
+     * The standard theme without GregTech's blue. Machine guis are painted in it from top to bottom, slots included,
+     * which looks right against the gui's own background but reads as a colour cast where the recipe viewer draws a
+     * recipe map's layout on its plain white recipe background.
+     */
+    public static final GTGuiTheme RECIPE_VIEWER = templateBuilder(Names.RECIPE_VIEWER)
+            .parent(Names.STANDARD)
+            .color(Color.WHITE.main)
             .build();
 
     // TODO make this better
