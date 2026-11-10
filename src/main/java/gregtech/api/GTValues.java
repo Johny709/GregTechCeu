@@ -175,7 +175,7 @@ public class GTValues {
     /**
      * GregTech Version
      */
-    public static final String VERSION = "2.9.0-beta";
+    public static final String VERSION = "2.9.0";
 
     private static Boolean isClient;
 
