@@ -172,6 +172,11 @@ public class GTValues {
      */
     public static final String MOD_NAME = "GregTech";
 
+    /**
+     * GregTech Version
+     */
+    public static final String VERSION = "2.9.0-beta";
+
     private static Boolean isClient;
 
     public static boolean isClientSide() {
