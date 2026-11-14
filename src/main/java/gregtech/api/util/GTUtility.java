@@ -472,7 +472,7 @@ public class GTUtility {
         };
     }
 
-    public static NBTTagCompound getOrCreateNbtCompound(ItemStack stack) {
+    public static @NotNull NBTTagCompound getOrCreateNbtCompound(@NotNull ItemStack stack) {
         NBTTagCompound compound = stack.getTagCompound();
         if (compound == null) {
             compound = new NBTTagCompound();
@@ -768,6 +768,13 @@ public class GTUtility {
         return result.toString();
     }
 
+    /**
+     * Get the {@link MetaTileEntity} at the position in the given world.
+     *
+     * @param world the world to check
+     * @param pos   the position of the mte
+     * @return the mte if there is one at the position, otherwise null
+     */
     public static @Nullable MetaTileEntity getMetaTileEntity(@Nullable IBlockAccess world, @Nullable BlockPos pos) {
         if (world == null || pos == null) return null;
         TileEntity te = world.getTileEntity(pos);
@@ -802,7 +809,7 @@ public class GTUtility {
         return world.isDaytime();
     }
 
-    public static MapColor getMapColor(int rgb) {
+    public static @NotNull MapColor getMapColor(int rgb) {
         MapColor color = MapColor.BLACK;
         int originalR = (rgb >> 16) & 0xFF;
         int originalG = (rgb >> 8) & 0xFF;
@@ -1236,6 +1243,28 @@ public class GTUtility {
      */
     public static void collapseFluidList(List<FluidStack> stacks) {
         collapseFluidList(stacks, Integer.MAX_VALUE, true);
+    }
+
+    /**
+     * Calculate the durability percentage based on how much damage something has taken
+     *
+     * @param damageTaken   how many points of durability damage the item has
+     * @param maxDurability the maximum durability the item can have
+     * @return 0 = full durability, 1 = zero durability
+     */
+    public static double calculateDurabilityFromDamageTaken(int damageTaken, int maxDurability) {
+        return (double) damageTaken / maxDurability;
+    }
+
+    /**
+     * Calculate the durability percentage based on how much durability out of the maximum is remaining
+     *
+     * @param remainingDurability how much durability out of the maximum the item has left
+     * @param maxDurability       the maximum durability the item can have
+     * @return 0 = full durability, 1 = zero durability
+     */
+    public static double calculateDurabilityFromRemaining(int remainingDurability, int maxDurability) {
+        return (double) (maxDurability - remainingDurability) / maxDurability;
     }
 
     public static boolean areFluidStacksEqual(@Nullable FluidStack a, @Nullable FluidStack b) {
