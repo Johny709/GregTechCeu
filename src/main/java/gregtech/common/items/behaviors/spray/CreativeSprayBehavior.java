@@ -190,8 +190,9 @@ public class CreativeSprayBehavior extends AbstractSprayBehavior implements Item
 
     @Override
     public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
-        if (!world.isRemote)
+        if (!world.isRemote) {
             MetaItemGuiFactory.open(player, hand);
+        }
         return ActionResult.newResult(EnumActionResult.SUCCESS, player.getHeldItem(hand));
     }
 
