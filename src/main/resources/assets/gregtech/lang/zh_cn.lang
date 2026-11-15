@@ -1223,8 +1223,6 @@ metaarmor.energy_share.disable=能量供给：装置充能已禁用
 metaarmor.energy_share.tooltip=供能模式：%s
 metaarmor.energy_share.tooltip.guide=持握物品并潜行右击以更换模式
 
-metaitem.record.sus.name=音乐唱片
-metaitem.record.sus.tooltip=§7Leonz - Among Us Drip
 
 metaitem.nan.certificate.name=不再是菜鸟的证明
 metaitem.nan.certificate.tooltip=已接受挑战！
@@ -5644,7 +5642,7 @@ gregtech.fluid.state_plasma=§a状态：等离子态
 gregtech.fluid.type_acid.tooltip=§6酸性物质！轻拿轻放！
 gregtech.gui.fuel_amount=燃料总量：
 gregtech.gui.fluid_amount=流体总量：
-gregtech.gui.amount_raw=数量：
+gregtech.gui.amount_raw=数量：%s
 gregtech.gui.toggle_view.disabled=切换视图（流体）
 gregtech.gui.toggle_view.enabled=切换视图（物品）
 gregtech.gui.overclock.enabled=已启用超频/n点击以禁用
@@ -6329,7 +6327,6 @@ gregtech.subtitle.use.wirecutter=剪线钳：剪断
 gregtech.subtitle.use.spray_can=喷漆罐：喷涂
 gregtech.subtitle.use.tricorder=三录仪：哔哔
 gregtech.subtitle.use.mortar=研钵：研磨
-gregtech.subtitle.record.sus=唱片：你有嫌疑
 gregtech.subtitle.entity.portal_opening=传送门：开启
 gregtech.subtitle.entity.portal_closing=传送门：关闭
 gregtech.subtitle.maintenance.electrical=机器：电网瘫痪
@@ -6541,5 +6538,3 @@ gregtech.scanner.forestry.pollen=§o花粉（已扫描）
 
 # Mutation
 gregtech.mutation.block_of=%s块
-
-record.sus=Leonz - Among Us Drip

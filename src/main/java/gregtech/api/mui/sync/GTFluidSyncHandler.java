@@ -11,6 +11,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.SoundEvent;
+import net.minecraft.util.text.TextFormatting;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTank;
 import net.minecraftforge.fluids.FluidUtil;
@@ -253,20 +254,27 @@ public class GTFluidSyncHandler extends SyncHandler {
             tankFluid = getLockedFluid();
         }
 
+        boolean showAmountInTooltip = showAmountInTooltip();
         if (!GTUtility.isEmpty(tankFluid)) {
             tooltip.addLine(KeyUtil.fluid(tankFluid));
 
+            if (showAmountInTooltip)
+                tooltip.addLine(KeyUtil.lang("gregtech.fluid.amount", tankFluid.amount, this.tank.getCapacity()));
+
             FluidTooltipUtil.handleFluidTooltip(tooltip, tankFluid);
 
-            if (showAmountInTooltip()) {
+            if (showAmountInTooltip) {
                 FluidTooltipUtil.addIngotMolFluidTooltip(tooltip, tankFluid);
             }
 
             tooltip.addLine(MCHelper.getFluidModName(tankFluid));
 
-            if (isPhantom() && showAmountInTooltip()) {
+            if (isPhantom() && showAmountInTooltip) {
                 tooltip.addLine(IKey.lang("modularui.fluid.phantom.control"));
             }
+        } else if (showAmountInTooltip) {
+            tooltip.addLine(KeyUtil.lang(TextFormatting.WHITE, "gregtech.fluid.empty"));
+            tooltip.addLine(KeyUtil.lang("gregtech.fluid.amount", 0, this.tank.getCapacity()));
         }
     }
 

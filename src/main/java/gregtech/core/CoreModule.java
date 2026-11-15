@@ -6,6 +6,7 @@ import gregtech.api.GregTechAPIInternal;
 import gregtech.api.block.IHeatingCoilBlockStats;
 import gregtech.api.block.coil.CoilManager;
 import gregtech.api.capability.SimpleCapabilityManager;
+import gregtech.api.color.ColoredBlockContainer;
 import gregtech.api.cover.CoverDefinition;
 import gregtech.api.fluids.GTFluidRegistration;
 import gregtech.api.gui.UIFactory;
@@ -21,6 +22,7 @@ import gregtech.api.mui.GTGuis;
 import gregtech.api.recipes.ModHandler;
 import gregtech.api.recipes.RecipeMap;
 import gregtech.api.recipes.properties.impl.TemperatureProperty;
+import gregtech.api.terminal2.Terminal2;
 import gregtech.api.unification.OreDictUnifier;
 import gregtech.api.unification.material.Materials;
 import gregtech.api.unification.material.event.MaterialEvent;
@@ -51,6 +53,7 @@ import gregtech.common.covers.filter.oreglob.impl.OreGlobParser;
 import gregtech.common.items.MetaItems;
 import gregtech.common.items.ToolItems;
 import gregtech.common.metatileentities.MetaTileEntities;
+import gregtech.common.metatileentities.electric.MetaTileEntityAlarm;
 import gregtech.common.worldgen.LootTableHelper;
 import gregtech.core.advancement.AdvancementTriggers;
 import gregtech.core.advancement.internal.AdvancementManager;
@@ -61,6 +64,7 @@ import gregtech.core.network.packets.PacketClipboard;
 import gregtech.core.network.packets.PacketClipboardNBTUpdate;
 import gregtech.core.network.packets.PacketClipboardUIWidgetUpdate;
 import gregtech.core.network.packets.PacketFluidVeinList;
+import gregtech.core.network.packets.PacketItemMouseEvent;
 import gregtech.core.network.packets.PacketKeysPressed;
 import gregtech.core.network.packets.PacketNotifyCapeChange;
 import gregtech.core.network.packets.PacketPluginSynced;
@@ -79,6 +83,7 @@ import gregtech.loaders.dungeon.DungeonLootLoader;
 import gregtech.modules.GregTechModules;
 
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.init.SoundEvents;
 import net.minecraft.world.World;
 import net.minecraftforge.classloading.FMLForgePlugin;
 import net.minecraftforge.common.MinecraftForge;
@@ -133,13 +138,17 @@ public class CoreModule implements IGregTechModule {
     }
 
     @Override
-    public void preInit(FMLPreInitializationEvent event) {
+    public void preInit(@NotNull FMLPreInitializationEvent event) {
         GregTechAPIInternal.preInit();
         GregTechAPI.advancementManager = AdvancementManager.getInstance();
         AdvancementTriggers.register();
 
         GregTechAPI.soundManager = SoundManager.getInstance();
         GTSoundEvents.register();
+        MetaTileEntityAlarm.addSound(GTSoundEvents.DEFAULT_ALARM);
+        MetaTileEntityAlarm.addSound(GTSoundEvents.ARC);
+        MetaTileEntityAlarm.addSound(SoundEvents.ENTITY_WOLF_HOWL);
+        MetaTileEntityAlarm.addSound(SoundEvents.ENTITY_ENDERMEN_DEATH);
 
         /* MUI Initialization */
         GTGuis.registerFactories();
@@ -250,10 +259,11 @@ public class CoreModule implements IGregTechModule {
         GregTechAPI.networkHandler.registerPacket(PacketClipboardNBTUpdate.class);
         GregTechAPI.networkHandler.registerPacket(PacketToolbeltSelectionChange.Server.class);
         GregTechAPI.networkHandler.registerPacket(PacketToolbeltSelectionChange.Client.class);
+        GregTechAPI.networkHandler.registerPacket(PacketItemMouseEvent.class);
     }
 
     @Override
-    public void init(FMLInitializationEvent event) {
+    public void init(@NotNull FMLInitializationEvent event) {
         // freeze once addon preInit is finished
         for (MTERegistry registry : mteManager.getRegistries()) {
             registry.freeze();
@@ -289,10 +299,12 @@ public class CoreModule implements IGregTechModule {
 
         DungeonLootLoader.init();
         MetaBlocks.registerWalkingSpeedBonus();
+
+        Terminal2.init();
     }
 
     @Override
-    public void postInit(FMLPostInitializationEvent event) {
+    public void postInit(@NotNull FMLPostInitializationEvent event) {
         proxy.onPostLoad();
         BedrockFluidVeinHandler.recalculateChances(true);
         // registers coil types for the BlastTemperatureProperty used in Blast Furnace Recipes
@@ -307,15 +319,16 @@ public class CoreModule implements IGregTechModule {
         }
 
         ModHandler.postInit();
+        ColoredBlockContainer.registerCEuContainers();
     }
 
     @Override
-    public void loadComplete(FMLLoadCompleteEvent event) {
+    public void loadComplete(@NotNull FMLLoadCompleteEvent event) {
         proxy.onLoadComplete();
     }
 
     @Override
-    public void serverStarting(FMLServerStartingEvent event) {
+    public void serverStarting(@NotNull FMLServerStartingEvent event) {
         CommandManager commandManager = CommandManager.getInstance();
         GregTechAPI.commandManager = commandManager;
         commandManager.registerServerCommand(event);
@@ -334,7 +347,7 @@ public class CoreModule implements IGregTechModule {
     }
 
     @Override
-    public void serverStarted(FMLServerStartedEvent event) {
+    public void serverStarted(@NotNull FMLServerStartedEvent event) {
         if (FMLCommonHandler.instance().getEffectiveSide() == Side.SERVER) {
             World world = FMLCommonHandler.instance().getMinecraftServerInstance().getEntityWorld();
             if (!world.isRemote) {
@@ -352,7 +365,7 @@ public class CoreModule implements IGregTechModule {
     }
 
     @Override
-    public void serverStopped(FMLServerStoppedEvent event) {
+    public void serverStopped(@NotNull FMLServerStoppedEvent event) {
         VirtualEnderRegistry.clearMaps();
         CapesRegistry.clearMaps();
     }

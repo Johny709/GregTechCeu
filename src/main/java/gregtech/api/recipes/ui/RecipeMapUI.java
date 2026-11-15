@@ -1,33 +1,62 @@
 package gregtech.api.recipes.ui;
 
+import com.cleanroommc.modularui.api.drawable.IDrawable;
+import com.cleanroommc.modularui.api.value.IDoubleValue;
+import com.cleanroommc.modularui.api.widget.IWidget;
+import com.cleanroommc.modularui.drawable.UITexture;
+import com.cleanroommc.modularui.screen.ModularPanel;
+import com.cleanroommc.modularui.utils.Alignment;
+import com.cleanroommc.modularui.value.DoubleValue;
+import com.cleanroommc.modularui.value.sync.DoubleSyncValue;
+import com.cleanroommc.modularui.value.sync.SyncHandlers;
+import com.cleanroommc.modularui.widget.Widget;
+import com.cleanroommc.modularui.widget.sizer.Area;
+
+import com.cleanroommc.modularui.widgets.ProgressWidget;
+
+import com.cleanroommc.modularui.widgets.layout.Flow;
+
+import com.cleanroommc.modularui.widgets.slot.ItemSlot;
+import com.cleanroommc.modularui.widgets.slot.SlotGroup;
+
 import gregtech.api.capability.impl.FluidTankList;
 import gregtech.api.gui.GuiTextures;
 import gregtech.api.gui.ModularUI;
 import gregtech.api.gui.resources.TextureArea;
-import gregtech.api.gui.widgets.ProgressWidget;
-import gregtech.api.gui.widgets.RecipeProgressWidget;
 import gregtech.api.gui.widgets.SlotWidget;
 import gregtech.api.gui.widgets.TankWidget;
+import gregtech.api.metatileentity.MetaTileEntity;
+import gregtech.api.mui.GTGuiTextures;
+import gregtech.api.mui.GTGuis;
+import gregtech.api.mui.widget.RecipeProgressWidget;
 import gregtech.api.recipes.Recipe;
 import gregtech.api.recipes.RecipeMap;
+import gregtech.common.mui.widget.GTFluidSlot;
 
+import it.unimi.dsi.fastutil.bytes.Byte2ObjectArrayMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraftforge.items.IItemHandlerModifiable;
-
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectMap;
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectOpenHashMap;
+
+import net.minecraftforge.items.ItemStackHandler;
+
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.UnmodifiableView;
 
+import java.util.Arrays;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.DoubleSupplier;
+import java.util.function.UnaryOperator;
 
 @ApiStatus.Experimental
 public class RecipeMapUI<R extends RecipeMap<?>> {
 
-    private final Byte2ObjectMap<TextureArea> slotOverlays = new Byte2ObjectOpenHashMap<>();
-
+    public static final String RECIPE_PROGRESS = "recipe.progress";
     private final R recipeMap;
     private final boolean modifyItemInputs;
     private final boolean modifyItemOutputs;
@@ -36,13 +65,36 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
 
     private final boolean isGenerator;
 
-    private TextureArea progressBarTexture = GuiTextures.PROGRESS_BAR_ARROW;
-    private ProgressWidget.MoveType moveType = ProgressWidget.MoveType.HORIZONTAL;
     private @Nullable TextureArea specialTexture;
-    private int @Nullable [] specialTexturePosition;
 
     private boolean isJEIVisible = true;
 
+    /* *********************** MUI 1 *********************** */
+
+    @Deprecated
+    private final @NotNull Area specialTexturePosition = new Area();
+    @Deprecated
+    private final Byte2ObjectMap<TextureArea> slotOverlays = new Byte2ObjectOpenHashMap<>();
+
+    @Deprecated
+    private TextureArea progressBarTexture = GuiTextures.PROGRESS_BAR_ARROW;
+    @Deprecated
+    private gregtech.api.gui.widgets.ProgressWidget.MoveType moveType = gregtech.api.gui.widgets.ProgressWidget.MoveType.HORIZONTAL;
+
+    /* *********************** MUI 2 *********************** */
+
+    private final Byte2ObjectMap<Int2ObjectMap<IDrawable>> overlays = new Byte2ObjectArrayMap<>(4);
+    private final Byte2ObjectMap<GroupOverlay> groupOverlays = new Byte2ObjectArrayMap<>(4);
+
+    @ApiStatus.Experimental
+    private boolean usesMui2 = false;
+    private UITexture progressTexture = GTGuiTextures.PROGRESS_BAR_ARROW;
+    private ProgressWidget.Direction progressDirection = ProgressWidget.Direction.RIGHT;
+    private Consumer<Widget<?>> extraOverlays = null;
+    private int width = GTGuis.DEFAULT_WIDTH;
+    private int height = GTGuis.DEFAULT_HEIGHT;
+
+    @Deprecated
     /**
      * @param recipeMap          the recipemap corresponding to this ui
      * @param modifyItemInputs   if item input amounts can be modified
@@ -107,6 +159,23 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
     }
 
     /**
+     * Determines the slot grid sizes for the item and fluid counts
+     *
+     * @param itemInputsCount  the amount of item slots
+     * @param fluidInputsCount the amount of fluid tanks
+     * @return [item grid width, item grid height, fluid grid width, fluid grid height]
+     */
+    @Contract("_, _ -> new")
+    public static int @NotNull [] determineSlotsGrid(int itemInputsCount, int fluidInputsCount) {
+        int[] arr = determineSlotsGrid(itemInputsCount);
+        int[] sizes = { arr[0], arr[1], 0, 0 };
+        arr = determineSlotsGrid(fluidInputsCount);
+        sizes[2] = arr[0];
+        sizes[3] = arr[1];
+        return sizes;
+    }
+
+    /**
      * Create a JEI UI Template
      *
      * @param importItems  the input item inventory
@@ -119,11 +188,11 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
     public ModularUI.Builder createJeiUITemplate(IItemHandlerModifiable importItems, IItemHandlerModifiable exportItems,
                                                  FluidTankList importFluids, FluidTankList exportFluids, int yOffset) {
         ModularUI.Builder builder = ModularUI.defaultBuilder(yOffset);
-        builder.widget(new RecipeProgressWidget(200, 78, 23 + yOffset, 20, 20, progressBarTexture,
-                moveType, recipeMap));
+        builder.widget(new gregtech.api.gui.widgets.RecipeProgressWidget(200, 78, 23 + yOffset, 20, 20,
+                progressBarTexture, moveType, recipeMap));
         addInventorySlotGroup(builder, importItems, importFluids, false, yOffset);
         addInventorySlotGroup(builder, exportItems, exportFluids, true, yOffset);
-        if (specialTexture != null && specialTexturePosition != null) {
+        if (specialTexture != null) {
             addSpecialTexture(builder);
         }
         return builder;
@@ -145,11 +214,11 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                                               FluidTankList exportFluids, int yOffset) {
         ModularUI.Builder builder = ModularUI.defaultBuilder(yOffset);
         builder.widget(
-                new RecipeProgressWidget(progressSupplier, 78, 23 + yOffset, 20, 20, progressBarTexture,
-                        moveType, recipeMap));
+                new gregtech.api.gui.widgets.RecipeProgressWidget(progressSupplier, 78, 23 + yOffset, 20, 20,
+                        progressBarTexture, moveType, recipeMap));
         addInventorySlotGroup(builder, importItems, importFluids, false, yOffset);
         addInventorySlotGroup(builder, exportItems, exportFluids, true, yOffset);
-        if (specialTexture != null && specialTexturePosition != null) {
+        if (specialTexture != null) {
             addSpecialTexture(builder);
         }
         return builder;
@@ -172,10 +241,10 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
                                                        FluidTankList exportFluids, int yOffset) {
         ModularUI.Builder builder = ModularUI.defaultBuilder(yOffset);
         builder.widget(
-                new RecipeProgressWidget(progressSupplier, 78, 23 + yOffset, 20, 20, progressBarTexture,
-                        moveType, recipeMap));
+                new gregtech.api.gui.widgets.RecipeProgressWidget(progressSupplier, 78, 23 + yOffset, 20, 20,
+                        progressBarTexture, moveType, recipeMap));
         addInventorySlotGroup(builder, importItems, importFluids, false, yOffset);
-        if (specialTexture != null && specialTexturePosition != null) {
+        if (specialTexture != null) {
             addSpecialTexture(builder);
         }
         return builder;
@@ -303,14 +372,14 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
     /**
      * @return the progress bar's move type
      */
-    public @NotNull ProgressWidget.MoveType progressBarMoveType() {
+    public gregtech.api.gui.widgets.ProgressWidget.@NotNull MoveType progressBarMoveType() {
         return moveType;
     }
 
     /**
      * @param moveType the new progress bar move type
      */
-    public void setProgressBarMoveType(@NotNull ProgressWidget.MoveType moveType) {
+    public void setProgressBarMoveType(gregtech.api.gui.widgets.ProgressWidget.MoveType moveType) {
         this.moveType = moveType;
     }
 
@@ -332,7 +401,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
      * @param progressBarTexture the new progress bar texture
      * @param moveType           the new progress bar move type
      */
-    public void setProgressBar(@NotNull TextureArea progressBarTexture, @NotNull ProgressWidget.MoveType moveType) {
+    public void setProgressBar(@NotNull TextureArea progressBarTexture, @NotNull gregtech.api.gui.widgets.ProgressWidget.MoveType moveType) {
         this.progressBarTexture = progressBarTexture;
         this.moveType = moveType;
     }
@@ -354,7 +423,11 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
      */
     public void setSpecialTexture(@NotNull TextureArea specialTexture, int @NotNull [] position) {
         this.specialTexture = specialTexture;
-        this.specialTexturePosition = position;
+        this.specialTexturePosition.set(
+                position[0],
+                position[1],
+                position[2],
+                position[3]);
     }
 
     /**
@@ -367,7 +440,7 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
     /**
      * @return the special texture's position
      */
-    public int @Nullable @UnmodifiableView [] specialTexturePosition() {
+    public Area specialTexturePosition() {
         return this.specialTexturePosition;
     }
 
@@ -378,54 +451,10 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
      * @return the updated builder
      */
     public @NotNull ModularUI.Builder addSpecialTexture(@NotNull ModularUI.Builder builder) {
-        if (specialTexturePosition != null) {
-            builder.image(specialTexturePosition[0], specialTexturePosition[1],
-                    specialTexturePosition[2],
-                    specialTexturePosition[3], specialTexture);
-        }
+        builder.image(specialTexturePosition.x(), specialTexturePosition.y(),
+                specialTexturePosition.w(),
+                specialTexturePosition.h(), specialTexture);
         return builder;
-    }
-
-    /**
-     * @return if this ui should be visible in JEI
-     */
-    public boolean isJEIVisible() {
-        return isJEIVisible;
-    }
-
-    /**
-     * @param isJEIVisible if the ui should be visible in JEI
-     */
-    public void setJEIVisible(boolean isJEIVisible) {
-        this.isJEIVisible = isJEIVisible;
-    }
-
-    /**
-     * @return if item input slot amounts can be modified
-     */
-    public boolean canModifyItemInputs() {
-        return modifyItemInputs;
-    }
-
-    /**
-     * @return if item output slot amounts can be modified
-     */
-    public boolean canModifyItemOutputs() {
-        return modifyItemOutputs;
-    }
-
-    /**
-     * @return if fluid input slot amounts can be modified
-     */
-    public boolean canModifyFluidInputs() {
-        return modifyFluidInputs;
-    }
-
-    /**
-     * @return if fluid output slot amounts can be modified
-     */
-    public boolean canModifyFluidOutputs() {
-        return modifyFluidOutputs;
     }
 
     /**
@@ -480,10 +509,691 @@ public class RecipeMapUI<R extends RecipeMap<?>> {
         this.slotOverlays.put(key, texture);
     }
 
+    /* *********************** MUI 2 *********************** */
+
+    public ModularPanel constructPanel(MetaTileEntity mte, UnaryOperator<PanelBuilder> builderFunction) {
+        return builderFunction.apply(new PanelBuilder()).build(mte);
+    }
+
+    /**
+     * Builds the same layout as {@link #constructPanel}, but detached from any machine. Used by the recipe viewer,
+     * which shows a recipe map without an owning {@link MetaTileEntity}.
+     *
+     * @param name the panel name, which has to be unique per recipe map
+     */
+    public ModularPanel constructStandalonePanel(String name, UnaryOperator<PanelBuilder> builderFunction) {
+        return builderFunction.apply(new PanelBuilder()).build(name);
+    }
+
+    /**
+     * Builds the layout the recipe viewer shows for this recipe map. The default is the grid a machine would get,
+     * which is right for a recipe map whose slots are only ever a block of inputs and a block of outputs. A subclass
+     * whose layout is its own - the assembly line's data slot sits outside the input grid, the coke oven has its own
+     * geometry entirely - overrides this, the way it used to override {@code createJeiUITemplate} for MUI1.
+     *
+     * @param name   the panel name, which has to be unique per recipe map
+     * @param layout the inventories the slots are placed over, and what to do with the slots once made
+     */
+    public ModularPanel constructRecipeViewerPanel(@NotNull String name, @NotNull RecipeViewerLayout layout) {
+        return constructStandalonePanel(name, builder -> builder
+                .setInputs(layout.importItems(), layout.importFluids())
+                .setOutputs(layout.exportItems(), layout.exportFluids())
+                .slotListener(layout.slotListener())
+                .inventorySlotGroups()
+                .progressWidget(viewerProgress(layout.progress())));
+    }
+
+    /**
+     * The leading half of a recipe, for the first of two chained progress bars: it fills up to {@code split} and then
+     * stays full while the second bar runs. Together with {@link #progressAfter} this replaces the MUI1
+     * {@code GTUtility#createPairedSupplier}, which shared a tracker between the two bars and so depended on their
+     * being drawn in order.
+     *
+     * @param split how far into the recipe the first bar hands over, 0 ~ 1
+     */
+    protected static DoubleSupplier progressUpTo(DoubleSupplier progress, double split) {
+        return () -> {
+            double value = progress.getAsDouble();
+            return value >= split ? 1d : value / split;
+        };
+    }
+
+    /** The trailing half: empty until the first bar is full, then filling over what is left. */
+    protected static DoubleSupplier progressAfter(DoubleSupplier progress, double split) {
+        return () -> {
+            double value = progress.getAsDouble();
+            return value >= split ? (value - split) / (1d - split) : 0d;
+        };
+    }
+
+    /**
+     * The value a progress bar in the recipe viewer runs off: a plain client-side value, read afresh on every frame.
+     * <p>
+     * A {@link DoubleSyncValue} is wrong here, even though that is what a machine's bar uses. Its
+     * {@code getDoubleValue} returns a cache which is only refreshed from the supplier by
+     * {@code PanelSyncManager#detectAndSendChanges}, driven by the container on the server - and the viewer's panel is
+     * detached, client-only and has no sync manager at all. The cache would therefore keep the value the supplier
+     * happened to return while the panel was being built, and the bar would sit at that fill forever.
+     */
+    protected static IDoubleValue<?> viewerProgress(@NotNull DoubleSupplier progress) {
+        return new DoubleValue.Dynamic(progress, null);
+    }
+
+    protected Int2ObjectMap<IDrawable> getOverlayMap(boolean isOutput, boolean isFluid) {
+        return this.overlays.computeIfAbsent(computeKey(isOutput, isFluid), k -> new Int2ObjectArrayMap<>());
+    }
+
+    protected GroupOverlay getGroupOverlay(boolean isOutput, boolean isFluid) {
+        return this.groupOverlays.computeIfAbsent(computeKey(isOutput, isFluid), k -> new GroupOverlay());
+    }
+
+    protected static byte computeKey(boolean isOutput, boolean isFluid) {
+        byte k = 0b00;
+        if (isOutput) k |= 0b10;
+        if (isFluid) k |= 0b01;
+        return k;
+    }
+
+    /** Marked experimental as this method will be removed when all GTCEu UIs are ported to MUI2. */
+    @ApiStatus.Experimental
+    @ApiStatus.Internal
+    public void setUsesMui2() {
+        this.usesMui2 = true;
+    }
+
+    /** Marked experimental as this method will be removed when all GTCEu UIs are ported to MUI2. */
+    @ApiStatus.Experimental
+    public boolean usesMui2() {
+        return usesMui2;
+    }
+
+    // todo this is a quick and dirty method, find a better way
+    /** Marked experimental as this method will be removed when all GTCEu UIs are ported to MUI2. */
+    @ApiStatus.Experimental
+    public RecipeMapUI<R> buildMui2(@NotNull Consumer<RecipeMapUIBuilder> builderConsumer) {
+        builderConsumer.accept(new RecipeMapUIBuilder(this));
+        return this;
+    }
+
+    /**
+     * @param progressTexture the new progress bar texture
+     */
+    public void setProgressBarTexture(@NotNull UITexture progressTexture) {
+        this.progressTexture = progressTexture;
+    }
+
+    /**
+     * @param direction the new progress bar move type
+     */
+    public void setProgressBarDirection(@NotNull ProgressWidget.Direction direction) {
+        this.progressDirection = direction;
+    }
+
+    /**
+     * @param extraOverlays Consumer for adding stuff to the progress widget
+     */
+    public void setSpecialTexture(Consumer<Widget<?>> extraOverlays) {
+        this.extraOverlays = extraOverlays;
+    }
+
+    /**
+     * @param texture  the texture to store
+     * @param index    the key to store the slot's texture with
+     * @param isFluid  if the slot is fluid
+     * @param isOutput if the slot is an output
+     */
+    @ApiStatus.Internal
+    public void setSlotOverlay(@NotNull IDrawable texture, int index, boolean isFluid, boolean isOutput) {
+        getOverlayMap(isOutput, isFluid).put(index, texture);
+    }
+
+    /**
+     * Store an overlay for every slot of a group. The amount of slots is resolved when the ui is built, so slots
+     * added after registration, i.e. by {@link RecipeMap#setMaxInputs(int)}, are covered as well.
+     *
+     * @param texture  the texture to store
+     * @param isFluid  if the slots are fluid slots
+     * @param isOutput if the slots are output slots
+     */
+    @ApiStatus.Internal
+    public void setSlotOverlayForGroup(@NotNull IDrawable texture, boolean isFluid, boolean isOutput) {
+        getGroupOverlay(isOutput, isFluid).all = texture;
+    }
+
+    /**
+     * Store an overlay for the last slot of a group.
+     *
+     * @param texture  the texture to store
+     * @param isFluid  if the slots are fluid slots
+     * @param isOutput if the slots are output slots
+     */
+    @ApiStatus.Internal
+    public void setSlotOverlayForLastSlot(@NotNull IDrawable texture, boolean isFluid, boolean isOutput) {
+        getGroupOverlay(isOutput, isFluid).last = texture;
+    }
+
+    /**
+     * Store an overlay for every slot of a group but the last one.
+     *
+     * @param texture  the texture to store
+     * @param isFluid  if the slots are fluid slots
+     * @param isOutput if the slots are output slots
+     */
+    @ApiStatus.Internal
+    public void setSlotOverlayExceptLastSlot(@NotNull IDrawable texture, boolean isFluid, boolean isOutput) {
+        getGroupOverlay(isOutput, isFluid).allButLast = texture;
+    }
+
+    /**
+     * @return if this ui should be visible in JEI
+     */
+    public boolean isJEIVisible() {
+        return isJEIVisible;
+    }
+
+    /**
+     * @param isJEIVisible if the ui should be visible in JEI
+     */
+    public void setJEIVisible(boolean isJEIVisible) {
+        this.isJEIVisible = isJEIVisible;
+    }
+
+    /**
+     * @return if item input slot amounts can be modified
+     */
+    public boolean canModifyItemInputs() {
+        return modifyItemInputs;
+    }
+
+    /**
+     * @return if item output slot amounts can be modified
+     */
+    public boolean canModifyItemOutputs() {
+        return modifyItemOutputs;
+    }
+
+    /**
+     * @return if fluid input slot amounts can be modified
+     */
+    public boolean canModifyFluidInputs() {
+        return modifyFluidInputs;
+    }
+
+    /**
+     * @return if fluid output slot amounts can be modified
+     */
+    public boolean canModifyFluidOutputs() {
+        return modifyFluidOutputs;
+    }
+
     /**
      * @return the UI's recipemap
      */
     public @NotNull R recipeMap() {
         return recipeMap;
+    }
+
+    public class PanelBuilder {
+
+        private int width = GTGuis.DEFAULT_WIDTH;
+        private int height = GTGuis.DEFAULT_HEIGHT;
+        private @NotNull CalculatedGrid inputs = CalculatedGrid.EMPTY;
+        private @NotNull CalculatedGrid outputs = CalculatedGrid.EMPTY;
+        private BiConsumer<ModularPanel, @NotNull Integer> extraWidgets;
+        private @Nullable SlotListener slotListener;
+        private boolean slotsCreated = false;
+        // should this be initialized to an sized empty widget?
+        private final IWidget[] inventoryRow = new IWidget[3]; // input, progress, output,
+        private boolean calculateOffset = false;
+
+        private static int calculatePixelWidth(CalculatedGrid inputGrid, CalculatedGrid outputGrid,
+                                               int progressSize, int margin) {
+            int leftWidth = inputGrid.getMaxWidth() * 18;
+            int rightWidth = outputGrid.getMaxWidth() * 18;
+
+            return (Math.max(leftWidth, rightWidth) + margin) * 2 + progressSize;
+        }
+
+        {
+            Arrays.fill(inventoryRow, new Widget<>().size(18));
+        }
+
+        public PanelBuilder setMaxSize(int w, int h) {
+            this.width = w;
+            this.height = h;
+            return this;
+        }
+
+        public PanelBuilder calculateOffset() {
+            this.calculateOffset = true;
+            return this;
+        }
+
+        public PanelBuilder setInputs(IItemHandlerModifiable items, FluidTankList fluids) {
+            this.inputs = calculateGrid(items, fluids);
+            return this;
+        }
+
+        public PanelBuilder setOutputs(IItemHandlerModifiable items, FluidTankList fluids) {
+            this.outputs = calculateGrid(items, fluids);
+            return this;
+        }
+
+        public PanelBuilder progressWidget(@NotNull DoubleSupplier supplier) {
+            return progressWidget(supplier, null);
+        }
+
+        public PanelBuilder progressWidget(@NotNull DoubleSupplier supplier,
+                                           @Nullable Consumer<RecipeProgressWidget> consumer) {
+            return progressWidget(new DoubleSyncValue(supplier), consumer);
+        }
+
+        public PanelBuilder progressWidget(@NotNull IDoubleValue<?> value) {
+            return progressWidget(value, null);
+        }
+
+        public PanelBuilder progressWidget(@NotNull IDoubleValue<?> value,
+                                           @Nullable Consumer<RecipeProgressWidget> consumer) {
+            RecipeProgressWidget progressWidget = new RecipeProgressWidget();
+            if (extraOverlays != null) {
+                extraOverlays.accept(progressWidget);
+            }
+            if (consumer != null) consumer.accept(progressWidget);
+            int progressSize = 20;
+            int margin = 6;
+            // the bar's length is passed to texture() rather than left to the widget: a ProgressWidget works its own
+            // size out on the first onResized, which MUI2 fires while the widget initialises and its area is still
+            // empty, and it never revisits that - a zero length makes the fill quantisation divide by zero and the
+            // filled half of the bar is then never drawn at all
+            inventoryRow[1] = progressWidget
+                    .recipeMap(recipeMap)
+                    .name(RECIPE_PROGRESS)
+                    .size(progressSize)
+                    .margin(margin, 0)
+                    .value(value)
+                    .texture(progressTexture, progressSize)
+                    .direction(progressDirection);
+            return this;
+        }
+
+        public PanelBuilder inventorySlotGroups() {
+            this.slotsCreated = true;
+            if (inputs.getItemCount() > 0 || inputs.getFluidCount() > 0) {
+                inventoryRow[0] = makeInventorySlotGroup(inputs, false);
+            }
+            if (outputs.getItemCount() > 0 || outputs.getFluidCount() > 0) {
+                inventoryRow[2] = makeInventorySlotGroup(outputs, true);
+            }
+            return this;
+        }
+
+        public PanelBuilder extraWidgets(BiConsumer<ModularPanel, @NotNull Integer> consumer) {
+            this.extraWidgets = consumer;
+            return this;
+        }
+
+        /**
+         * Called for every slot this builder creates, so a caller that needs to know where the slots ended up - the
+         * recipe viewer, which has to hand those positions to JEI - can keep hold of them. Set it before
+         * {@link #inventorySlotGroups()}, which is what creates the slots.
+         */
+        public PanelBuilder slotListener(@Nullable SlotListener listener) {
+            if (this.slotsCreated) {
+                throw new IllegalStateException("The slot listener must be set before the slots are created!");
+            }
+            this.slotListener = listener;
+            return this;
+        }
+
+        public ModularPanel build(MetaTileEntity mte) {
+            return build((w, h) -> GTGuis.createPanel(mte, w, h));
+        }
+
+        public ModularPanel build(String name) {
+            return build((w, h) -> GTGuis.createPanel(name, w, h));
+        }
+
+        private ModularPanel build(PanelFactory panelFactory) {
+            int yOffset;
+            if (calculateOffset && isOversized()) {
+                yOffset = 9; // font height
+            } else {
+                yOffset = 0;
+            }
+
+            int inputHeight = inputs.getMaxHeight();
+            int outputHeight = outputs.getMaxHeight();
+
+            ModularPanel panel = panelFactory.create(this.width, adjustHeight(inputHeight, outputHeight) + yOffset);
+
+            if (extraWidgets != null) extraWidgets.accept(panel, yOffset);
+
+            int rowHeight = 3 * 18;
+            if (Math.max(inputHeight, outputHeight) < 3) {
+                rowHeight -= 18;
+            }
+
+            Flow row = Flow.row()
+                    .height(rowHeight)
+                    .name("row:inventory_group_parent")
+                    .alignX(0.5f)
+                    .crossAxisAlignment(Alignment.CrossAxis.CENTER)
+                    .top(23 - 7);
+
+            // yes this is duplicated from the progress widget
+            int progressSize = 20;
+            int margin = 6;
+            row.width(calculatePixelWidth(inputs, outputs, progressSize, margin));
+
+            if (inputs.getMaxWidth() < outputs.getMaxWidth()) {
+                row.mainAxisAlignment(Alignment.MainAxis.END);
+            }
+
+            for (IWidget widget : inventoryRow) {
+                row.child(widget);
+            }
+
+            return panel.child(row);
+        }
+
+        // honestly this should be done on the MTE side
+        // maybe put this behind a boolean?
+        protected int adjustHeight(int inputHeight, int outputHeight) {
+            if (Math.max(inputHeight, outputHeight) < 4) {
+                return this.height - 18;
+            }
+            return this.height;
+        }
+
+        protected boolean isOversized() {
+            return recipeMap.getMaxInputs() >= 6 || recipeMap.getMaxFluidInputs() >= 6 ||
+                    recipeMap.getMaxOutputs() >= 6 || recipeMap.getMaxFluidOutputs() >= 6;
+        }
+
+        protected IWidget makeItemGroup(CalculatedGrid grid, boolean isOutputs) {
+            Flow col = Flow.column()
+                    .mainAxisAlignment(Alignment.MainAxis.END)
+                    .coverChildren()
+                    .name(String.format("col:%s_item_group", isOutputs ? "output" : "input"));
+            int width = grid.getItemGridWidth();
+            int height = grid.getItemGridHeight();
+            int count = grid.getItemCount();
+
+            SlotGroup slotGroup = new SlotGroup(isOutputs ? "output_items" : "input_items", width, 1, !isOutputs);
+            for (int i = 0; i < height; i++) {
+                Flow row = Flow.row()
+                        .mainAxisAlignment(isOutputs ? Alignment.MainAxis.START : Alignment.MainAxis.END)
+                        .coverChildren()
+                        .name("row:item_" + i);
+                for (int j = 0; j < width; j++) {
+                    int slotIndex = (i * width) + j;
+                    // the grid can hold more slots than the handler has, fill the remainder with empty cells
+                    // so the columns stay aligned
+                    row.child(slotIndex < count ? makeItemSlot(slotGroup, slotIndex, grid.getItemHandler(), isOutputs) :
+                            emptyCell());
+                }
+                col.child(row);
+            }
+            return col;
+        }
+
+        protected IWidget makeFluidGroup(CalculatedGrid grid, boolean isOutputs) {
+            Flow col = Flow.column()
+                    .mainAxisAlignment(Alignment.MainAxis.START)
+                    .coverChildren()
+                    .name(String.format("col:%s_fluid_group", isOutputs ? "output" : "input"));
+
+            int width = grid.getFluidGridWidth();
+            int height = grid.getFluidGridHeight();
+            int count = grid.getFluidCount();
+
+            for (int i = 0; i < height; i++) {
+                Flow row = Flow.row()
+                        .mainAxisAlignment(isOutputs ? Alignment.MainAxis.START : Alignment.MainAxis.END)
+                        .coverChildren()
+                        .name("row:fluid_" + i);
+                for (int j = 0; j < width; j++) {
+                    int slotIndex = (i * width) + j;
+                    row.child(slotIndex < count ? makeFluidSlot(slotIndex, grid.getFluidHandler(), isOutputs) :
+                            emptyCell());
+                }
+                col.child(row);
+            }
+            return col;
+        }
+
+        @NotNull
+        protected IWidget makeInventorySlotGroup(CalculatedGrid grid, boolean isOutputs) {
+            final int itemInputsCount = grid.getItemCount();
+            boolean onlyFluids = itemInputsCount == 0;
+            final int fluidInputsCount = grid.getFluidCount();
+            if (fluidInputsCount == 0 && onlyFluids) {
+                // nothing to do here
+                throw new IllegalArgumentException("item and fluid handlers are empty!");
+            }
+
+            int itemGridHeight = grid.getFluidGridHeight();
+            int fluidGridHeight = grid.getFluidGridHeight();
+            if (!onlyFluids) {
+                itemGridHeight = grid.getItemGridHeight();
+            }
+
+            boolean singleRow = grid.isSingleRow();
+
+            Flow flow = (singleRow ? Flow.row() : Flow.column())
+                    .coverChildren()
+                    .name(singleRow ? "row:parent" : "col:parent");
+            flow.crossAxisAlignment(isOutputs ? Alignment.CrossAxis.START : Alignment.CrossAxis.END);
+
+            if (!onlyFluids && fluidGridHeight > 1) {
+                // 1 should be 18, 2 should be 0, 3 should be -18, 4 should be -36
+                // this is to make the first item row align with progress widget
+                flow.top((2 - itemGridHeight) * 18);
+            }
+
+            if (itemInputsCount > 6) {
+                flow.top(0);
+            }
+
+            if (onlyFluids) {
+                flow.childIf(fluidInputsCount > 0, () -> makeFluidGroup(grid, isOutputs));
+            } else {
+                flow.childIf(!singleRow || isOutputs, () -> makeItemGroup(grid, isOutputs));
+                flow.childIf(fluidInputsCount > 0, () -> makeFluidGroup(grid, isOutputs));
+                flow.childIf(singleRow && !isOutputs, () -> makeItemGroup(grid, isOutputs));
+            }
+
+            return flow;
+        }
+
+        /** A blank cell of slot size, used to pad grids which are larger than the amount of slots. */
+        protected IWidget emptyCell() {
+            return new Widget<>().size(18);
+        }
+
+        public ItemSlot makeItemSlot(SlotGroup group, int slotIndex, IItemHandlerModifiable itemHandler,
+                                    boolean isOutputs) {
+            ItemSlot slot = new ItemSlot()
+                    .name("item.slot." + slotIndex + ":" + group.getName())
+                    .slot(SyncHandlers.itemSlot(itemHandler, slotIndex)
+                            .slotGroup(group)
+                            .accessibility(!isOutputs, true))
+                    .background(getDrawableOverlaysForSlot(isOutputs, false, slotIndex, itemHandler.getSlots()));
+            if (this.slotListener != null) this.slotListener.onSlot(slot, false, isOutputs, slotIndex);
+            return slot;
+        }
+
+        public GTFluidSlot makeFluidSlot(int slotIndex, FluidTankList fluidHandler, boolean isOutputs) {
+            GTFluidSlot slot = new GTFluidSlot()
+                    .name("fluid.slot." + slotIndex)
+                    .syncHandler(GTFluidSlot.sync(fluidHandler.getTankAt(slotIndex))
+                            .accessibility(true, !isOutputs)
+                            .drawAlwaysFull(true))
+                    .background(getDrawableOverlaysForSlot(isOutputs, true, slotIndex, fluidHandler.getTanks()));
+            if (this.slotListener != null) this.slotListener.onSlot(slot, true, isOutputs, slotIndex);
+            return slot;
+        }
+
+        @ApiStatus.Experimental
+        protected IDrawable getDrawableOverlaysForSlot(boolean isOutput, boolean isFluid, int index, int slotCount) {
+            UITexture base = isFluid ? GTGuiTextures.FLUID_SLOT : GTGuiTextures.SLOT;
+            Int2ObjectMap<IDrawable> overlays = getOverlayMap(isOutput, isFluid);
+            if (overlays.containsKey(index)) {
+                return IDrawable.of(base, overlays.get(index));
+            }
+            IDrawable overlay = getGroupOverlay(isOutput, isFluid).get(index, slotCount);
+            if (overlay != null) {
+                return IDrawable.of(base, overlay);
+            }
+            return IDrawable.of(base);
+        }
+    }
+
+    /** Creates the panel a {@link PanelBuilder} fills, so the same layout can be built with or without a machine. */
+    @FunctionalInterface
+    public interface PanelFactory {
+
+        ModularPanel create(int width, int height);
+    }
+
+    /** Receives every slot a {@link PanelBuilder} creates, in the order they are created. */
+    @FunctionalInterface
+    public interface SlotListener {
+
+        void onSlot(IWidget slot, boolean isFluid, boolean isOutput, int index);
+    }
+
+    /**
+     * What a recipe viewer hands {@link #constructRecipeViewerPanel} to have a recipe map laid out: the empty
+     * inventories the slots are placed over, the progress bar's animation, and the listener which collects the slots
+     * as they are made, since the viewer draws the ingredients itself and needs to know where they ended up.
+     */
+    public static final class RecipeViewerLayout {
+
+        private final IItemHandlerModifiable importItems, exportItems;
+        private final FluidTankList importFluids, exportFluids;
+        private final DoubleSupplier progress;
+        private final SlotListener slotListener;
+
+        public RecipeViewerLayout(@NotNull IItemHandlerModifiable importItems,
+                                  @NotNull IItemHandlerModifiable exportItems,
+                                  @NotNull FluidTankList importFluids, @NotNull FluidTankList exportFluids,
+                                  @NotNull DoubleSupplier progress, @NotNull SlotListener slotListener) {
+            this.importItems = importItems;
+            this.exportItems = exportItems;
+            this.importFluids = importFluids;
+            this.exportFluids = exportFluids;
+            this.progress = progress;
+            this.slotListener = slotListener;
+        }
+
+        public IItemHandlerModifiable importItems() {
+            return this.importItems;
+        }
+
+        public IItemHandlerModifiable exportItems() {
+            return this.exportItems;
+        }
+
+        public FluidTankList importFluids() {
+            return this.importFluids;
+        }
+
+        public FluidTankList exportFluids() {
+            return this.exportFluids;
+        }
+
+        public DoubleSupplier progress() {
+            return this.progress;
+        }
+
+        public SlotListener slotListener() {
+            return this.slotListener;
+        }
+    }
+
+    /** Overlays which apply to a whole group of slots, resolved against the actual amount of slots. */
+    protected static class GroupOverlay {
+
+        private @Nullable IDrawable all;
+        private @Nullable IDrawable allButLast;
+        private @Nullable IDrawable last;
+
+        public @Nullable IDrawable get(int index, int slotCount) {
+            if (this.last != null && index == slotCount - 1) return this.last;
+            if (this.allButLast != null && index < slotCount - 1) return this.allButLast;
+            return this.all;
+        }
+    }
+
+    protected static CalculatedGrid calculateGrid(IItemHandlerModifiable items, FluidTankList fluids) {
+        return new CalculatedGrid(items, fluids);
+    }
+
+    protected static class CalculatedGrid {
+
+        private static final CalculatedGrid EMPTY = new CalculatedGrid(new ItemStackHandler(0),
+                new FluidTankList(false));
+        private final IItemHandlerModifiable itemHandler;
+        private final FluidTankList fluidHandler;
+        private final int[] grid;
+
+        private CalculatedGrid(IItemHandlerModifiable itemHandler, FluidTankList fluidHandler) {
+            this.itemHandler = itemHandler;
+            this.fluidHandler = fluidHandler;
+            this.grid = RecipeMapUI.determineSlotsGrid(this.getItemCount(), this.getFluidCount());
+        }
+
+        public IItemHandlerModifiable getItemHandler() {
+            return itemHandler;
+        }
+
+        public int getItemCount() {
+            return this.itemHandler.getSlots();
+        }
+
+        public int getItemGridWidth() {
+            return this.grid[0];
+        }
+
+        public int getItemGridHeight() {
+            return this.grid[1];
+        }
+
+        public FluidTankList getFluidHandler() {
+            return fluidHandler;
+        }
+
+        public int getFluidCount() {
+            return this.fluidHandler.getTanks();
+        }
+
+        public int getFluidGridWidth() {
+            return this.grid[2];
+        }
+
+        public int getFluidGridHeight() {
+            return this.grid[3];
+        }
+
+        public int getMaxWidth() {
+            if (isSingleRow()) {
+                return getFluidGridWidth() + getItemGridWidth();
+            } else {
+                return Math.max(getFluidGridWidth(), getItemGridWidth());
+            }
+        }
+
+        public int getMaxHeight() {
+            if (isSingleRow()) {
+                return Math.max(getFluidGridHeight(), getItemGridHeight());
+            } else {
+                return getFluidGridHeight() + getItemGridHeight();
+            }
+        }
+
+        private boolean isSingleRow() {
+            return getItemGridHeight() >= getFluidCount() && getItemGridWidth() < 3;
+        }
     }
 }

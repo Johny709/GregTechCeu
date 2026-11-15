@@ -19,6 +19,8 @@ import gregtech.api.metatileentity.multiblock.MultiblockAbility;
 import gregtech.api.metatileentity.multiblock.MultiblockControllerBase;
 import gregtech.api.mui.GTGuiTextures;
 import gregtech.api.mui.GTGuis;
+import gregtech.api.mui.IMetaTileEntityGuiHolder;
+import gregtech.api.mui.MetaTileEntityGuiData;
 import gregtech.api.mui.widget.GhostCircuitSlotWidget;
 import gregtech.client.renderer.texture.Textures;
 import gregtech.client.renderer.texture.cube.SimpleOverlayRenderer;
@@ -38,13 +40,13 @@ import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidUtil;
 import net.minecraftforge.fluids.IFluidTank;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
+import net.minecraftforge.fluids.capability.IFluidTankProperties;
 import net.minecraftforge.items.IItemHandlerModifiable;
 
 import codechicken.lib.render.CCRenderState;
 import codechicken.lib.render.pipeline.IVertexOperation;
 import codechicken.lib.vec.Matrix4;
 import com.cleanroommc.modularui.api.drawable.IKey;
-import com.cleanroommc.modularui.factory.PosGuiData;
 import com.cleanroommc.modularui.network.NetworkUtils;
 import com.cleanroommc.modularui.screen.ModularPanel;
 import com.cleanroommc.modularui.screen.UISettings;
@@ -65,7 +67,7 @@ import java.util.List;
 
 public class MetaTileEntityFluidHatch extends MetaTileEntityMultiblockNotifiablePart
                                       implements IMultiblockAbilityPart<IFluidTank>, IControllable,
-                                      IGhostSlotConfigurable {
+                                      IGhostSlotConfigurable, IMetaTileEntityGuiHolder {
 
     public static final int INITIAL_INVENTORY_SIZE = 8000;
 
@@ -91,7 +93,6 @@ public class MetaTileEntityFluidHatch extends MetaTileEntityMultiblockNotifiable
         super.initializeInventory();
         if (this.hasGhostCircuitInventory()) {
             this.circuitInventory = new GhostCircuitItemStackHandler(this);
-            this.circuitInventory.addNotifiableMetaTileEntity(this);
         }
     }
 
@@ -250,7 +251,7 @@ public class MetaTileEntityFluidHatch extends MetaTileEntityMultiblockNotifiable
 
     @Override
     protected IItemHandlerModifiable createImportItemHandler() {
-        return new FilteredItemHandler(this, 1).setFillPredicate(
+        return new FilteredItemHandler(this, 1,
                 FilteredItemHandler.getCapabilityFilter(CapabilityFluidHandler.FLUID_HANDLER_ITEM_CAPABILITY));
     }
 
@@ -277,12 +278,8 @@ public class MetaTileEntityFluidHatch extends MetaTileEntityMultiblockNotifiable
     }
 
     @Override
-    public boolean usesMui2() {
-        return true;
-    }
-
-    @Override
-    public ModularPanel buildUI(PosGuiData guiData, PanelSyncManager guiSyncManager, UISettings settings) {
+    public @NotNull ModularPanel buildUI(MetaTileEntityGuiData guiData, PanelSyncManager guiSyncManager,
+                                         UISettings settings) {
         var fluidSyncHandler = GTFluidSlot.sync(fluidTank)
                 .showAmountOnSlot(false)
                 .accessibility(true, !isExportHatch);
@@ -364,7 +361,14 @@ public class MetaTileEntityFluidHatch extends MetaTileEntityMultiblockNotifiable
                                     if (!isExportHatch) return true;
                                     var h = FluidUtil.getFluidHandler(stack);
                                     if (h == null) return false;
-                                    return h.getTankProperties()[0].getContents() == null;
+                                    // the export hatch only fills containers, so accept every container which
+                                    // still has room left, including partially filled ones
+                                    for (IFluidTankProperties properties : h.getTankProperties()) {
+                                        FluidStack contents = properties.getContents();
+                                        if (contents == null || contents.amount < properties.getCapacity())
+                                            return true;
+                                    }
+                                    return false;
                                 })
                                 .accessibility(true, true)))
                 .bindPlayerInventory();

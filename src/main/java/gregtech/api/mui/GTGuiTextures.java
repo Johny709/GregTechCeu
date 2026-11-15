@@ -32,6 +32,7 @@ public class GTGuiTextures {
         public static final String PRIMITIVE_BACKGROUND = id("primitive_bg");
 
         public static final String STANDARD_SLOT = id("standard_slot");
+        public static final String DARK_SLOT = id("dark_slot");
         public static final String BRONZE_SLOT = id("bronze_slot");
         public static final String STEEL_SLOT = id("steel_slot");
         public static final String PRIMITIVE_SLOT = id("primitive_slot");
@@ -64,6 +65,9 @@ public class GTGuiTextures {
     public static final IDrawable GREGTECH_LOGO_BLINKING_RED = animated(
             "textures/gui/icon/gregtech_logo_blinking_red.png", 17, 34, 36);
 
+    public static final UITexture GREGTECH_LOGO_BRONZE = fullImage("textures/gui/base/logo_bronze");
+    public static final UITexture GREGTECH_LOGO_STEEL = fullImage("textures/gui/base/logo_steel");
+
     public static final UITexture INDICATOR_NO_ENERGY = fullImage("textures/gui/base/indicator_no_energy.png");
     public static final UITexture INDICATOR_NO_STEAM_BRONZE = fullImage(
             "textures/gui/base/indicator_no_steam_bronze.png");
@@ -74,7 +78,7 @@ public class GTGuiTextures {
     // BACKGROUNDS
     public static final UITexture BACKGROUND = UITexture.builder()
             .location(GTValues.MODID, "textures/gui/base/background.png")
-            .imageSize(176, 166)
+            .imageSize(16, 16)
             .adaptable(3)
             .name(IDs.STANDARD_BACKGROUND)
             .canApplyTheme()
@@ -82,7 +86,7 @@ public class GTGuiTextures {
 
     public static final UITexture BACKGROUND_POPUP = UITexture.builder()
             .location(GTValues.MODID, "textures/gui/base/background_popup.png")
-            .imageSize(195, 136)
+            .imageSize(16, 16)
             .adaptable(4)
             .name(IDs.COVER_BACKGROUND)
             .canApplyTheme()
@@ -92,14 +96,14 @@ public class GTGuiTextures {
 
     public static final UITexture BACKGROUND_BRONZE = UITexture.builder()
             .location(GTValues.MODID, "textures/gui/base/background_bronze.png")
-            .imageSize(176, 166)
+            .imageSize(16, 16)
             .adaptable(3)
             .name(IDs.BRONZE_BACKGROUND)
             .build();
 
     public static final UITexture BACKGROUND_STEEL = UITexture.builder()
             .location(GTValues.MODID, "textures/gui/base/background_steel.png")
-            .imageSize(176, 166)
+            .imageSize(16, 16)
             .adaptable(3)
             .name(IDs.STEEL_BACKGROUND)
             .build();
@@ -107,12 +111,14 @@ public class GTGuiTextures {
     // todo move to textures/gui/base
     public static final UITexture BACKGROUND_PRIMITIVE = UITexture.builder()
             .location(GTValues.MODID, "textures/gui/primitive/primitive_background.png")
-            .imageSize(176, 166)
+            .imageSize(16, 16)
             .adaptable(3)
             .name(IDs.PRIMITIVE_BACKGROUND)
             .build();
 
-    // todo clipboard backgrounds, may deserve some redoing
+    public static final UITexture CLIPBOARD_BACKGROUND = fullImage(
+            "textures/gui/base/clipboard_background.png");
+
 
     // DISPLAYS
     public static final UITexture DISPLAY = new UITexture.Builder()
@@ -156,6 +162,14 @@ public class GTGuiTextures {
             .imageSize(18, 18)
             .adaptable(1)
             .name(IDs.STANDARD_SLOT)
+            .canApplyTheme()
+            .build();
+
+    public static final UITexture SLOT_DARK = new UITexture.Builder()
+            .location(GTValues.MODID, "textures/gui/base/slot_dark.png")
+            .imageSize(18, 18)
+            .adaptable(1)
+            .name(IDs.DARK_SLOT)
             .canApplyTheme()
             .build();
 
@@ -222,6 +236,16 @@ public class GTGuiTextures {
     public static final UITexture[] BUTTON_MATCH_ALL = slice("textures/gui/widget/ore_filter/button_match_all.png",
             16, 32, 16, 16, ColorType.DEFAULT);
     public static final UITexture BUTTON_LOCK = fullImage("textures/gui/widget/button_lock.png");
+    public static final UITexture BUTTON_LEFT = fullImage("textures/gui/widget/left.png");
+    public static final UITexture BUTTON_RIGHT = fullImage("textures/gui/widget/right.png");
+
+    public static final UITexture[] CLIPBOARD_BUTTON = slice("textures/gui/widget/clipboard_button.png",
+            15, 60, 15, 15);
+    public static final UITexture CLIPBOARD_TEXT_BOX = UITexture.builder()
+            .location(GTValues.MODID, "textures/gui/widget/clipboard_text_box.png")
+            .imageSize(9, 18)
+            .adaptable(1)
+            .build();
 
     public static final UITexture OREDICT_ERROR = fullImage("textures/gui/widget/ore_filter/error.png");
     public static final UITexture OREDICT_INFO = fullImage("textures/gui/widget/ore_filter/info.png");
@@ -267,6 +291,7 @@ public class GTGuiTextures {
     public static final UITexture MENU_OVERLAY = fullImage("textures/gui/overlay/menu_overlay.png");
 
     public static final UITexture RECIPE_LOCK = fullImage("textures/gui/widget/lock.png");
+    public static final UITexture RECIPE_LOCK_WHITE = fullImage("textures/gui/widget/lock_white.png");
     public static final UITexture PRIMITIVE_FURNACE_OVERLAY = fullImage(
             "textures/gui/primitive/overlay_primitive_furnace.png");
     public static final UITexture PRIMITIVE_DUST_OVERLAY = fullImage(
@@ -289,6 +314,11 @@ public class GTGuiTextures {
             ColorType.DEFAULT);
     public static final UITexture FLUID_LOCK_OVERLAY = fullImage("textures/gui/widget/button_lock.png",
             ColorType.DEFAULT);
+
+    public static final UITexture TERMINAL_FRAME = fullImage("textures/gui/terminal/terminal_frame.png");
+    public static final UITexture HOME_BUTTON = fullImage("textures/gui/terminal/home_button.png");
+    public static final UITexture HOME_BUTTON_HOVER = fullImage("textures/gui/terminal/home_button_hover.png");
+    public static final UITexture CAPES_APP_ICON = fullImage("textures/gui/terminal/capes/icon.png");
 
     // todo bronze/steel/primitive fluid slots?
 
@@ -724,6 +754,21 @@ public class GTGuiTextures {
             "textures/gui/progress_bar/progress_bar_fluid_rig_depletion.png", 190, 14);
 
     // MISC
+    public static final UITexture RGB_GRADIENT = fullImage("textures/gui/widget/rgb_gradient.png");
+    public static final UITexture SPEAKER_ICON = fullImage("textures/gui/widget/speaker.png");
+    public static final UITexture MAINTENANCE_ICON = fullImage("textures/gui/widget/button_maintenance.png",
+            ColorType.DEFAULT);
+
+    // ME hatch/bus
+    public static final UITexture NUMBER_BACKGROUND = fullImage("textures/gui/widget/number_background.png");
+    public static final UITexture CONFIG_ARROW = fullImage("textures/gui/widget/config_arrow.png");
+    public static final UITexture CONFIG_ARROW_DARK = fullImage("textures/gui/widget/config_arrow_dark.png");
+    public static final UITexture SELECT_BOX = fullImage("textures/gui/widget/select_box.png");
+    public static final UITexture BUTTON_AUTO_PULL = fullImage("textures/gui/widget/button_me_auto_pull.png");
+    public static final UITexture ARROW_DOUBLE = fullImage("textures/gui/widget/arrow_double.png");
+    public static final UITexture ARROW_OPPOSITE = fullImage("textures/gui/widget/opposite_arrows.png");
+    public static final UITexture[] AUTO_PULL = slice("textures/gui/widget/button_me_auto_pull.png",
+            16, 32, 16, 16, ColorType.DEFAULT);
 
     public static void init() {/**/}
 
@@ -802,12 +847,12 @@ public class GTGuiTextures {
     }
 
     // todo steam logos? multi indicator blinking logos?
-    public static @NotNull UITexture getLogo(GTGuiTheme theme) {
+    public static @NotNull UITexture getLogo(@Nullable GTGuiTheme theme) {
         if (theme != null) {
             UITexture logo = theme.getLogo();
             if (logo != null) return logo;
         }
-        return GTValues.XMAS.get() ? GREGTECH_LOGO_XMAS : GREGTECH_LOGO;
+        return GTValues.isXMAS() ? GREGTECH_LOGO_XMAS : GREGTECH_LOGO;
     }
 
     public static IDrawable dynamic(UITexture[] textures, int rate) {

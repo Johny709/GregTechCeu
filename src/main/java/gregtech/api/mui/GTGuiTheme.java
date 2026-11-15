@@ -1,5 +1,6 @@
 package gregtech.api.mui;
 
+import gregtech.api.GTValues;
 import gregtech.api.cover.CoverWithUI;
 import gregtech.common.ConfigHolder;
 
@@ -30,6 +31,7 @@ public class GTGuiTheme {
         public static final int BRONZE = 0xFF7706;
         public static final int STEEL = 0x57576A;
         public static final int PRIMITIVE = 0x826B51;
+        public static final int CLIPBOARD_TEXT = 0x1E1E1E;
     }
 
     public static class Names {
@@ -39,6 +41,8 @@ public class GTGuiTheme {
         public static final String BRONZE = gregtech("bronze");
         public static final String STEEL = gregtech("steel");
         public static final String PRIMITIVE = gregtech("primitive");
+        public static final String CLIPBOARD = gregtech("clipboard");
+        public static final String RECIPE_VIEWER = gregtech("recipe_viewer");
 
         private static String gregtech(String s) {
             return "gregtech:" + s;
@@ -56,6 +60,7 @@ public class GTGuiTheme {
             .simpleToggleButton(IDs.STANDARD_BUTTON,
                     IDs.STANDARD_SLOT,
                     ConfigHolder.client.defaultUIColor)
+            .logo(() -> GTValues.XMAS.get() ? GTGuiTextures.GREGTECH_LOGO_XMAS : GTGuiTextures.GREGTECH_LOGO)
             .build();
 
     public static final GTGuiTheme COVER = templateBuilder(Names.COVER)
@@ -77,6 +82,7 @@ public class GTGuiTheme {
             .color(Colors.BRONZE)
             .simpleToggleButton(IDs.BRONZE_BUTTON, IDs.BRONZE_BUTTON_SELECTED,
                     ConfigHolder.client.defaultUIColor)
+            .logo(() -> GTGuiTextures.GREGTECH_LOGO_BRONZE)
             .build();
 
     public static final GTGuiTheme STEEL = templateBuilder(Names.STEEL)
@@ -88,6 +94,7 @@ public class GTGuiTheme {
             .button(IDs.STEEL_BUTTON)
             .simpleToggleButton(IDs.STEEL_BUTTON, IDs.STEEL_BUTTON_SELECTED,
                     ConfigHolder.client.defaultUIColor)
+            .logo(() -> GTGuiTextures.GREGTECH_LOGO_STEEL)
             .color(Colors.STEEL)
             .build();
 
@@ -97,6 +104,31 @@ public class GTGuiTheme {
             .textColor(Color.WHITE.darker(1))
             .color(Colors.PRIMITIVE)
             .itemSlot(GTGuiTextures.IDs.PRIMITIVE_SLOT)
+            .build();
+
+    /**
+     * Draws no backgrounds at all, so that only the paper textures the clipboard sets on its own widgets are
+     * visible.
+     */
+    public static final GTGuiTheme CLIPBOARD = templateBuilder(Names.CLIPBOARD)
+            .noBackgrounds()
+            .textColor(Colors.CLIPBOARD_TEXT)
+            .build();
+
+    /**
+     * The standard theme without GregTech's blue. Machine guis are painted in it from top to bottom, slots included,
+     * which looks right against the gui's own background but reads as a colour cast where the recipe viewer draws a
+     * recipe map's layout on its plain white recipe background.
+     */
+    public static final GTGuiTheme RECIPE_VIEWER = templateBuilder(Names.RECIPE_VIEWER)
+            .parent(Names.STANDARD)
+            .color(Color.WHITE.main)
+            .build();
+
+    // TODO make this better
+    public static final GTGuiTheme TERMINAL = templateBuilder("gregtech_terminal")
+            .parent(Names.STANDARD)
+            .textColor(0xFFFDFDFD)
             .build();
 
     protected final String themeId;
@@ -229,6 +261,28 @@ public class GTGuiTheme {
         public Builder textShadow() {
             theme.elementBuilder.add(b -> b.add("textShadow", true));
             return this;
+        }
+
+        /**
+         * Removes every background this theme would draw on its own, including the ones drawn while hovering a
+         * widget. Use for UIs that draw all of their own textures, since a widget cannot opt out of the hover
+         * background of its theme by itself.
+         */
+        public Builder noBackgrounds() {
+            theme.elementBuilder.add(b -> b
+                    .add("background", "none")
+                    .add("panel", noBackground())
+                    .add("panel:hover", noBackground())
+                    .add("button", noBackground())
+                    .add("button:hover", noBackground())
+                    .add("textField", noBackground())
+                    .add("textField:hover", noBackground()));
+            return this;
+        }
+
+        /** Note that the hovered variant of a widget theme is a separate entry, suffixed with {@code :hover}. */
+        private static JsonBuilder noBackground() {
+            return new JsonBuilder().add("background", "none");
         }
 
         /**

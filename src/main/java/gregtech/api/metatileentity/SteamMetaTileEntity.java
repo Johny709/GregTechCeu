@@ -1,5 +1,13 @@
 package gregtech.api.metatileentity;
 
+import com.cleanroommc.modularui.api.drawable.IDrawable;
+import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.drawable.DynamicDrawable;
+import com.cleanroommc.modularui.screen.ModularPanel;
+import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.value.sync.BooleanSyncValue;
+import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.cleanroommc.modularui.widgets.SlotGroupWidget;
 import gregtech.api.GTValues;
 import gregtech.api.capability.impl.CommonFluidFilters;
 import gregtech.api.capability.impl.FilteredFluidHandler;
@@ -8,6 +16,10 @@ import gregtech.api.capability.impl.RecipeLogicSteam;
 import gregtech.api.gui.GuiTextures;
 import gregtech.api.gui.ModularUI;
 import gregtech.api.gui.widgets.ImageWidget;
+import gregtech.api.mui.GTGuiTextures;
+import gregtech.api.mui.GTGuiTheme;
+import gregtech.api.mui.IMetaTileEntityGuiHolder;
+import gregtech.api.mui.MetaTileEntityGuiData;
 import gregtech.api.recipes.RecipeMap;
 import gregtech.api.util.GTUtility;
 import gregtech.client.particle.VanillaParticleEffects;
@@ -41,7 +53,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Objects;
 
-public abstract class SteamMetaTileEntity extends MetaTileEntity {
+public abstract class SteamMetaTileEntity extends MetaTileEntity implements IMetaTileEntityGuiHolder {
 
     protected static final int STEAM_CAPACITY = 16000;
 
@@ -127,6 +139,44 @@ public abstract class SteamMetaTileEntity extends MetaTileEntity {
         return new FluidTankList(false, steamFluidTank);
     }
 
+    @Override
+    public ModularPanel buildUI(MetaTileEntityGuiData guiData, PanelSyncManager panelSyncManager, UISettings settings) {
+        RecipeMap<?> map = Objects.requireNonNull(getRecipeMap());
+
+        BooleanSyncValue hasNoSteam = new BooleanSyncValue(workableHandler::isHasNotEnoughEnergy);
+        panelSyncManager.syncValue("has_energy", hasNoSteam);
+
+        ModularPanel panel = map.getRecipeMapUI()
+                .constructPanel(this, builder -> builder
+                        .setMaxSize(176, 170)
+                        .setInputs(importItems, importFluids)
+                        .setOutputs(exportItems, exportFluids)
+                        .inventorySlotGroups()
+                        .progressWidget(workableHandler::getProgressPercent, widget -> {
+                            // todo add tooltip for no steam?
+                            widget.overlay(new DynamicDrawable(() -> hasNoSteam.getBoolValue() ?
+                                    getIndicator() : IDrawable.NONE)
+                                    .asIcon().size(18).marginTop(50));
+                        }));
+        return panel.child(IKey.lang(getMetaFullName()).asWidget().pos(5, 5))
+                .child(getUITheme().getLogo().asWidget()
+                        .size(16)
+                        .right(7)
+                        .top(46))
+                .child(SlotGroupWidget.playerInventory((index, widgetSlot) -> widgetSlot
+                                .background(GTGuiTextures.SLOT))
+                        .horizontalCenter().bottom(7));
+    }
+
+    public IDrawable getIndicator() {
+        return isHighPressure ? GTGuiTextures.INDICATOR_NO_STEAM_STEEL : GTGuiTextures.INDICATOR_NO_STEAM_BRONZE;
+    }
+
+    @Override
+    public GTGuiTheme getUITheme() {
+        return isHighPressure ? GTGuiTheme.STEEL : GTGuiTheme.BRONZE;
+    }
+
     public ModularUI.Builder createUITemplate(EntityPlayer player) {
         return ModularUI.builder(GuiTextures.BACKGROUND_STEAM.get(isHighPressure), 176, 166)
                 .label(6, 6, getMetaFullName()).shouldColor(false)
@@ -136,7 +186,7 @@ public abstract class SteamMetaTileEntity extends MetaTileEntity {
     }
 
     @Override
-    public SoundEvent getSound() {
+    public @Nullable SoundEvent getSound() {
         return Objects.requireNonNull(workableHandler.getRecipeMap()).getSound();
     }
 

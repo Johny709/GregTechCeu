@@ -7,11 +7,14 @@ import gregtech.api.gui.ModularUI;
 import gregtech.api.gui.widgets.ClickButtonWidget;
 import gregtech.api.gui.widgets.ImageCycleButtonWidget;
 import gregtech.api.gui.widgets.SimpleTextWidget;
-import gregtech.api.gui.widgets.TextFieldWidget2;
 import gregtech.api.items.gui.ItemUIFactory;
 import gregtech.api.items.gui.PlayerInventoryHolder;
 import gregtech.api.items.metaitem.stats.IItemBehaviour;
 import gregtech.api.metatileentity.interfaces.IGregTechTileEntity;
+import gregtech.api.mui.GTGuiTextures;
+import gregtech.api.mui.GTGuiTheme;
+import gregtech.api.mui.GTGuis;
+import gregtech.api.mui.factory.MetaItemGuiFactory;
 import gregtech.common.items.MetaItems;
 import gregtech.common.metatileentities.MetaTileEntityClipboard;
 
@@ -29,88 +32,165 @@ import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.World;
 
 import codechicken.lib.raytracer.RayTracer;
+import com.cleanroommc.modularui.api.drawable.IKey;
+import com.cleanroommc.modularui.drawable.UITexture;
+import com.cleanroommc.modularui.factory.HandGuiData;
+import com.cleanroommc.modularui.screen.ModularPanel;
+import com.cleanroommc.modularui.screen.UISettings;
+import com.cleanroommc.modularui.utils.Alignment;
+import com.cleanroommc.modularui.value.sync.InteractionSyncHandler;
+import com.cleanroommc.modularui.value.sync.IntSyncValue;
+import com.cleanroommc.modularui.value.sync.PanelSyncManager;
+import com.cleanroommc.modularui.value.sync.StringSyncValue;
+import com.cleanroommc.modularui.widgets.ButtonWidget;
+import com.cleanroommc.modularui.widgets.CycleButtonWidget;
+import com.cleanroommc.modularui.widgets.textfield.TextFieldWidget;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.function.Supplier;
 
 import static gregtech.common.metatileentities.MetaTileEntities.CLIPBOARD_TILE;
 
 public class ClipboardBehavior implements IItemBehaviour, ItemUIFactory {
 
     public static final int MAX_PAGES = 25;
-    private static final int TEXT_COLOR = 0x1E1E1E;
+    public static final int TASKS_PER_PAGE = 8;
+    private static final int BUTTON_STATES = 4;
+    private static final int TEXT_COLOR = GTGuiTheme.Colors.CLIPBOARD_TEXT;
 
     @Override
-    public ModularUI createUI(PlayerInventoryHolder holder, EntityPlayer entityPlayer) {
-        ModularUI.Builder builder = ModularUI.builder(GuiTextures.CLIPBOARD_BACKGROUND, 186, 263);
-        initNBT(holder.getCurrentItem());
+    public GTGuiTheme getUITheme() {
+        return GTGuiTheme.CLIPBOARD;
+    }
 
-        List<TextFieldWidget2> textFields = new ArrayList<>();
+    @Override
+    public ModularPanel buildUI(HandGuiData guiData, PanelSyncManager guiSyncManager, UISettings settings) {
+        ItemStack held = guiData.getUsedItemStack();
+        return createPanel(held, () -> guiData.getPlayer().getHeldItem(guiData.getHand()), guiSyncManager,
+                () -> guiData.getPlayer().inventory.markDirty());
+    }
 
-        builder.image(28, 28, 130, 12, GuiTextures.CLIPBOARD_TEXT_BOX);
-        textFields.add(new TextFieldWidget2(30, 30, 126, 9, () -> getTitle(holder), val -> setTitle(holder, val))
-                .setMaxLength(25)
-                .setCentered(true)
-                .setTextColor(TEXT_COLOR));
+    /**
+     * Builds the editable clipboard panel. Used both for the clipboard held in hand and for the clipboard placed on a
+     * wall, which is why the edited stack is passed as a supplier instead of directly.
+     *
+     * @param panelStack the stack the panel is named after
+     * @param clipboard  supplies the stack whose NBT is edited. Its tag is mutated in place, so that the fake in-world
+     *                   gui, which holds on to the same stack, keeps rendering the current page
+     * @param onChange   run on the server after every edit, to persist the new NBT
+     */
+    public static ModularPanel createPanel(ItemStack panelStack, Supplier<ItemStack> clipboard,
+                                           PanelSyncManager syncManager, Runnable onChange) {
+        initNBT(clipboard.get());
 
-        for (int i = 0; i < 8; i++) {
-            int finalI = i;
-            builder.widget(new ImageCycleButtonWidget(14, 55 + 22 * i, 15, 15, GuiTextures.CLIPBOARD_BUTTON, 4,
-                    () -> getButtonState(holder, finalI), (x) -> setButton(holder, finalI, x)));
+        IntSyncValue pageNum = new IntSyncValue(() -> getPageNum(clipboard.get()));
+        syncManager.syncValue("page_index", pageNum);
 
-            builder.image(32, 58 + 22 * i, 140, 12, GuiTextures.CLIPBOARD_TEXT_BOX);
-            textFields.add(new TextFieldWidget2(34, 60 + 22 * i, 136, 9, () -> getString(holder, finalI),
-                    val -> setString(holder, finalI, val))
+        ModularPanel panel = GTGuis.createPanel(panelStack, 186, 263)
+                .background(GTGuiTextures.CLIPBOARD_BACKGROUND);
+
+        panel.child(GTGuiTextures.CLIPBOARD_TEXT_BOX.asWidget()
+                .pos(28, 28)
+                .size(130, 12))
+                .child(new TextFieldWidget()
+                        .pos(30, 30)
+                        .size(126, 9)
+                        .setMaxLength(25)
+                        .setTextColor(TEXT_COLOR)
+                        .setTextAlignment(Alignment.Center)
+                        .value(new StringSyncValue(() -> getTitle(clipboard.get()), title -> {
+                            setTitle(clipboard.get(), title);
+                            onChange.run();
+                        })));
+
+        for (int i = 0; i < TASKS_PER_PAGE; i++) {
+            int task = i;
+            CycleButtonWidget stateButton = new CycleButtonWidget()
+                    .pos(14, 55 + 22 * task)
+                    .size(15, 15)
+                    .stateCount(BUTTON_STATES)
+                    .value(new IntSyncValue(() -> getButtonState(clipboard.get(), task), state -> {
+                        setButton(clipboard.get(), task, state);
+                        onChange.run();
+                    }));
+            for (int state = 0; state < BUTTON_STATES; state++) {
+                stateButton.stateBackground(state, GTGuiTextures.CLIPBOARD_BUTTON[state]);
+            }
+
+            panel.child(stateButton)
+                    .child(GTGuiTextures.CLIPBOARD_TEXT_BOX.asWidget()
+                            .pos(32, 58 + 22 * task)
+                            .size(140, 12))
+                    .child(new TextFieldWidget()
+                            .pos(34, 60 + 22 * task)
+                            .size(136, 9)
                             .setMaxLength(23)
-                            .setTextColor(TEXT_COLOR));
+                            .setTextColor(TEXT_COLOR)
+                            .value(new StringSyncValue(() -> getString(clipboard.get(), task), text -> {
+                                setString(clipboard.get(), task, text);
+                                onChange.run();
+                            })));
         }
 
-        for (TextFieldWidget2 textField : textFields) {
-            builder.widget(textField.setOnFocus(textField2 -> textFields.forEach(textField3 -> {
-                if (textField3 != textField2) {
-                    textField3.unFocus();
-                }
-            })));
+        return panel.child(pageButton(GTGuiTextures.BUTTON_LEFT, 38, clipboard, -1, onChange))
+                .child(pageButton(GTGuiTextures.BUTTON_RIGHT, 132, clipboard, 1, onChange))
+                .child(IKey.dynamic(() -> (pageNum.getIntValue() + 1) + " / " + MAX_PAGES)
+                        .asWidget()
+                        .pos(0, 236)
+                        .size(186, 9)
+                        .alignment(Alignment.Center)
+                        .color(TEXT_COLOR));
+    }
+
+    /** The read only variant rendered on the clipboard hanging on a wall. Still legacy MUI. */
+    public static ModularUI createMTEUI(PlayerInventoryHolder holder, EntityPlayer entityPlayer) {
+        initNBT(holder.getCurrentItem());
+        ModularUI.Builder builder = ModularUI.builder(GuiTextures.CLIPBOARD_PAPER_BACKGROUND, 170, 238);
+
+        builder.image(18, 8, 130, 14, GuiTextures.CLIPBOARD_TEXT_BOX);
+        builder.widget(new SimpleTextWidget(20, 10, "", TEXT_COLOR, () -> getTitle(holder.getCurrentItem()), true)
+                .setCenter(false));
+
+        for (int i = 0; i < TASKS_PER_PAGE; i++) {
+            int task = i;
+            builder.widget(new ImageCycleButtonWidget(6, 37 + 20 * task, 15, 15, GuiTextures.CLIPBOARD_BUTTON,
+                    BUTTON_STATES, () -> getButtonState(holder.getCurrentItem(), task),
+                    state -> setButton(holder.getCurrentItem(), task, state)));
+            builder.image(22, 38 + 20 * task, 140, 12, GuiTextures.CLIPBOARD_TEXT_BOX);
+            builder.widget(new SimpleTextWidget(24, 40 + 20 * task, "", TEXT_COLOR,
+                    () -> getString(holder.getCurrentItem(), task), true).setCenter(false));
         }
 
-        builder.widget(new ClickButtonWidget(38, 231, 16, 16, "", (x) -> incrPageNum(holder, x.isShiftClick ? -10 : -1))
-                .setButtonTexture(GuiTextures.BUTTON_LEFT).setShouldClientCallback(true));
-        builder.widget(new ClickButtonWidget(132, 231, 16, 16, "", (x) -> incrPageNum(holder, x.isShiftClick ? 10 : 1))
-                .setButtonTexture(GuiTextures.BUTTON_RIGHT).setShouldClientCallback(true));
-        builder.widget(new SimpleTextWidget(93, 240, "", TEXT_COLOR,
-                () -> (getPageNum(holder) + 1) + " / " + MAX_PAGES, true));
+        builder.widget(new ClickButtonWidget(30, 200, 16, 16, "",
+                click -> incrPageNum(holder.getCurrentItem(), click.isShiftClick ? -10 : -1))
+                        .setButtonTexture(GuiTextures.BUTTON_LEFT).setShouldClientCallback(true));
+        builder.widget(new ClickButtonWidget(124, 200, 16, 16, "",
+                click -> incrPageNum(holder.getCurrentItem(), click.isShiftClick ? 10 : 1))
+                        .setButtonTexture(GuiTextures.BUTTON_RIGHT).setShouldClientCallback(true));
+        builder.widget(new SimpleTextWidget(85, 208, "", TEXT_COLOR,
+                () -> (getPageNum(holder.getCurrentItem()) + 1) + " / " + MAX_PAGES, true));
 
         builder.shouldColor(false);
         return builder.build(holder, entityPlayer);
     }
 
-    public static ModularUI createMTEUI(PlayerInventoryHolder holder, EntityPlayer entityPlayer) { // So that people
-                                                                                                   // don't click on any
-                                                                                                   // text fields
-        initNBT(holder.getCurrentItem());
-        ModularUI.Builder builder = ModularUI.builder(GuiTextures.CLIPBOARD_PAPER_BACKGROUND, 170, 238);
-
-        builder.image(18, 8, 130, 14, GuiTextures.CLIPBOARD_TEXT_BOX);
-        builder.widget(new SimpleTextWidget(20, 10, "", TEXT_COLOR, () -> getTitle(holder), true).setCenter(false));
-
-        for (int i = 0; i < 8; i++) {
-            int finalI = i;
-            builder.widget(new ImageCycleButtonWidget(6, 37 + 20 * i, 15, 15, GuiTextures.CLIPBOARD_BUTTON, 4,
-                    () -> getButtonState(holder, finalI), (x) -> setButton(holder, finalI, x)));
-            builder.image(22, 38 + 20 * i, 140, 12, GuiTextures.CLIPBOARD_TEXT_BOX);
-            builder.widget(new SimpleTextWidget(24, 40 + 20 * i, "", TEXT_COLOR, () -> getString(holder, finalI), true)
-                    .setCenter(false));
-        }
-
-        builder.widget(new ClickButtonWidget(30, 200, 16, 16, "", (x) -> incrPageNum(holder, x.isShiftClick ? -10 : -1))
-                .setButtonTexture(GuiTextures.BUTTON_LEFT).setShouldClientCallback(true));
-        builder.widget(new ClickButtonWidget(124, 200, 16, 16, "", (x) -> incrPageNum(holder, x.isShiftClick ? 10 : 1))
-                .setButtonTexture(GuiTextures.BUTTON_RIGHT).setShouldClientCallback(true));
-        builder.widget(new SimpleTextWidget(85, 208, "", TEXT_COLOR,
-                () -> (getPageNum(holder) + 1) + " / " + MAX_PAGES, true));
-
-        builder.shouldColor(false);
-        return builder.build(holder, entityPlayer);
+    private static ButtonWidget<?> pageButton(UITexture texture, int x, Supplier<ItemStack> clipboard, int step,
+                                              Runnable onChange) {
+        ButtonWidget<?> button = new ButtonWidget<>();
+        button.pos(x, 231)
+                .size(16, 16)
+                .background(texture)
+                // a click is handled before the panel drops the focus, so a text field would commit its content
+                // only after the page was turned, writing it to the page that was switched to. Commit it here.
+                .onMousePressed(mouseButton -> {
+                    button.getContext().removeFocus();
+                    return false; // let the sync handler turn the page
+                })
+                .syncHandler(new InteractionSyncHandler()
+                        .setOnMousePressed(data -> {
+                            incrPageNum(clipboard.get(), data.shift ? step * 10 : step);
+                            onChange.run();
+                        }));
+        return button;
     }
 
     private static NBTTagCompound getPageCompound(ItemStack stack) {
@@ -138,7 +218,7 @@ public class ClipboardBehavior implements IItemBehaviour, ItemUIFactory {
             NBTTagCompound pageCompound = new NBTTagCompound();
             pageCompound.setShort("ButStat", (short) 0);
             pageCompound.setString("Title", "");
-            for (int i = 0; i < 8; i++) {
+            for (int i = 0; i < TASKS_PER_PAGE; i++) {
                 pageCompound.setString("Task" + i, "");
             }
 
@@ -150,8 +230,7 @@ public class ClipboardBehavior implements IItemBehaviour, ItemUIFactory {
         }
     }
 
-    private static void setButton(PlayerInventoryHolder holder, int pos, int newState) {
-        ItemStack stack = holder.getCurrentItem();
+    private static void setButton(ItemStack stack, int pos, int newState) {
         if (!MetaItems.CLIPBOARD.isItemEqual(stack))
             return;
         NBTTagCompound tagCompound = getPageCompound(stack);
@@ -165,8 +244,7 @@ public class ClipboardBehavior implements IItemBehaviour, ItemUIFactory {
         setPageCompound(stack, tagCompound);
     }
 
-    private static int getButtonState(PlayerInventoryHolder holder, int pos) {
-        ItemStack stack = holder.getCurrentItem();
+    private static int getButtonState(ItemStack stack, int pos) {
         if (!MetaItems.CLIPBOARD.isItemEqual(stack))
             return 0;
         NBTTagCompound tagCompound = getPageCompound(stack);
@@ -175,8 +253,7 @@ public class ClipboardBehavior implements IItemBehaviour, ItemUIFactory {
         return ((buttonState >> pos * 2) & 3);
     }
 
-    private static void setString(PlayerInventoryHolder holder, int pos, String newString) {
-        ItemStack stack = holder.getCurrentItem();
+    private static void setString(ItemStack stack, int pos, String newString) {
         if (!MetaItems.CLIPBOARD.isItemEqual(stack))
             return;
         NBTTagCompound tagCompound = getPageCompound(stack);
@@ -184,16 +261,14 @@ public class ClipboardBehavior implements IItemBehaviour, ItemUIFactory {
         setPageCompound(stack, tagCompound);
     }
 
-    private static String getString(PlayerInventoryHolder holder, int pos) {
-        ItemStack stack = holder.getCurrentItem();
+    private static String getString(ItemStack stack, int pos) {
         if (!MetaItems.CLIPBOARD.isItemEqual(stack))
             return "";
         NBTTagCompound tagCompound = getPageCompound(stack);
         return tagCompound.getString("Task" + pos);
     }
 
-    private static void setTitle(PlayerInventoryHolder holder, String newString) {
-        ItemStack stack = holder.getCurrentItem();
+    private static void setTitle(ItemStack stack, String newString) {
         if (!MetaItems.CLIPBOARD.isItemEqual(stack))
             return;
         NBTTagCompound tagCompound = getPageCompound(stack);
@@ -202,24 +277,21 @@ public class ClipboardBehavior implements IItemBehaviour, ItemUIFactory {
         setPageCompound(stack, tagCompound);
     }
 
-    private static String getTitle(PlayerInventoryHolder holder) {
-        ItemStack stack = holder.getCurrentItem();
+    private static String getTitle(ItemStack stack) {
         if (!MetaItems.CLIPBOARD.isItemEqual(stack))
             return "";
         NBTTagCompound tagCompound = getPageCompound(stack);
         return tagCompound.getString("Title");
     }
 
-    private static int getPageNum(PlayerInventoryHolder holder) {
-        ItemStack stack = holder.getCurrentItem();
+    private static int getPageNum(ItemStack stack) {
         if (!MetaItems.CLIPBOARD.isItemEqual(stack))
             return 1;
         NBTTagCompound tagCompound = stack.getTagCompound();
         return tagCompound.getInteger("PageIndex");
     }
 
-    private static void incrPageNum(PlayerInventoryHolder holder, int increment) {
-        ItemStack stack = holder.getCurrentItem();
+    private static void incrPageNum(ItemStack stack, int increment) {
         if (!MetaItems.CLIPBOARD.isItemEqual(stack))
             return;
         NBTTagCompound tagCompound = stack.getTagCompound();
@@ -235,12 +307,11 @@ public class ClipboardBehavior implements IItemBehaviour, ItemUIFactory {
     public ActionResult<ItemStack> onItemRightClick(World world, EntityPlayer player, EnumHand hand) {
         ItemStack heldItem = player.getHeldItem(hand);
         if (!world.isRemote && RayTracer.retrace(player).typeOfHit != RayTraceResult.Type.BLOCK) { // So that the player
-                                                                                                   // doesn't place a
-                                                                                                   // clipboard before
-                                                                                                   // suddenly getting
-                                                                                                   // the GUI
-            PlayerInventoryHolder holder = new PlayerInventoryHolder(player, hand);
-            holder.openUI();
+                                                                                                  // doesn't place a
+                                                                                                  // clipboard before
+                                                                                                  // suddenly getting
+                                                                                                  // the GUI
+            MetaItemGuiFactory.open(player, hand);
         }
         return ActionResult.newResult(EnumActionResult.SUCCESS, heldItem);
     }

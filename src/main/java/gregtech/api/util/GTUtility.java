@@ -3,6 +3,8 @@ package gregtech.api.util;
 import gregtech.api.GTValues;
 import gregtech.api.GregTechAPI;
 import gregtech.api.block.machines.MachineItemBlock;
+import gregtech.api.capability.GregtechCapabilities;
+import gregtech.api.capability.IElectricItem;
 import gregtech.api.capability.IMultipleTankHandler;
 import gregtech.api.cover.CoverDefinition;
 import gregtech.api.fluids.GTFluid;
@@ -20,6 +22,7 @@ import gregtech.api.unification.OreDictUnifier;
 import gregtech.api.unification.ore.OrePrefix;
 import gregtech.api.unification.stack.ItemAndMetadata;
 import gregtech.api.util.function.impl.TimedProgressSupplier;
+import gregtech.common.ConfigHolder;
 
 import net.minecraft.block.BlockRedstoneWire;
 import net.minecraft.block.BlockSnow;
@@ -45,6 +48,8 @@ import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraftforge.common.BiomeDictionary;
 import net.minecraftforge.common.util.Constants;
+import net.minecraftforge.energy.CapabilityEnergy;
+import net.minecraftforge.energy.IEnergyStorage;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.FluidTank;
@@ -52,10 +57,14 @@ import net.minecraftforge.fluids.IFluidTank;
 import net.minecraftforge.fluids.capability.CapabilityFluidHandler;
 import net.minecraftforge.fluids.capability.IFluidHandlerItem;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
+import net.minecraftforge.fml.relauncher.Side;
+import net.minecraftforge.fml.relauncher.SideOnly;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.IItemHandlerModifiable;
 
+import com.cleanroommc.modularui.api.widget.Interactable;
 import com.google.common.util.concurrent.AtomicDouble;
+import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -65,6 +74,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Range;
 
+import java.awt.geom.Rectangle2D;
+import java.time.MonthDay;
+import java.time.ZoneId;
 import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
@@ -460,7 +472,7 @@ public class GTUtility {
         };
     }
 
-    public static NBTTagCompound getOrCreateNbtCompound(ItemStack stack) {
+    public static @NotNull NBTTagCompound getOrCreateNbtCompound(@NotNull ItemStack stack) {
         NBTTagCompound compound = stack.getTagCompound();
         if (compound == null) {
             compound = new NBTTagCompound();
@@ -756,10 +768,17 @@ public class GTUtility {
         return result.toString();
     }
 
-    public static MetaTileEntity getMetaTileEntity(IBlockAccess world, BlockPos pos) {
+    /**
+     * Get the {@link MetaTileEntity} at the position in the given world.
+     *
+     * @param world the world to check
+     * @param pos   the position of the mte
+     * @return the mte if there is one at the position, otherwise null
+     */
+    public static @Nullable MetaTileEntity getMetaTileEntity(@Nullable IBlockAccess world, @Nullable BlockPos pos) {
         if (world == null || pos == null) return null;
         TileEntity te = world.getTileEntity(pos);
-        return te instanceof IGregTechTileEntity ? ((IGregTechTileEntity) te).getMetaTileEntity() : null;
+        return te instanceof IGregTechTileEntity igtte ? igtte.getMetaTileEntity() : null;
     }
 
     public static MetaTileEntity getMetaTileEntity(ItemStack stack) {
@@ -790,7 +809,7 @@ public class GTUtility {
         return world.isDaytime();
     }
 
-    public static MapColor getMapColor(int rgb) {
+    public static @NotNull MapColor getMapColor(int rgb) {
         MapColor color = MapColor.BLACK;
         int originalR = (rgb >> 16) & 0xFF;
         int originalG = (rgb >> 8) & 0xFF;
@@ -954,13 +973,38 @@ public class GTUtility {
     }
 
     /**
-     * Safely cast a Long to an Int without overflow.
+     * Safely multiply two Integers without overflow or underflow, returning {@link Integer#MAX_VALUE} or
+     * {@link Integer#MIN_VALUE} if it would have.
      *
-     * @param v The Long value to cast to an Int.
-     * @return v, cast to Int, or Integer.MAX_VALUE if it would overflow.
+     * @param num The Long value to cast to an Int.
      */
-    public static int safeCastLongToInt(long v) {
-        return v > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) v;
+    public static int safeCastLongToInt(long num) {
+        if (num > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        } else if (num < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        } else {
+            return (int) num;
+        }
+    }
+
+    /**
+     * Safely multiply two Ints without overflow or underflow.
+     */
+    public static int multiplySaturated(int a, int b) {
+        return safeCastLongToInt((long) a * b);
+    }
+
+    /**
+     * Safely multiply two Longs without overflow or underflow, returning {@link Long#MAX_VALUE} or
+     * {@link Long#MIN_VALUE} if it would have.
+     */
+    public static long multiplySaturated(long a, long b) {
+        if (a > 0 && b > 0 && a > Long.MAX_VALUE / b) return Long.MAX_VALUE;
+        if (a < 0 && b < 0 && a < Long.MAX_VALUE / b) return Long.MAX_VALUE;
+        if (a > 0 && b < 0 && b < Long.MIN_VALUE / a) return Long.MIN_VALUE;
+        if (a < 0 && b > 0 && a < Long.MIN_VALUE / b) return Long.MIN_VALUE;
+        return a * b;
     }
 
     /**
@@ -1002,9 +1046,16 @@ public class GTUtility {
         return Math.min(voltage, GTValues.VA[workingTier]);
     }
 
+    // TODO: remove once ColorUtil from pr 2858 is merged
     public static int combineRGB(@Range(from = 0, to = 255) int r, @Range(from = 0, to = 255) int g,
                                  @Range(from = 0, to = 255) int b) {
         return (r << 16) | (g << 8) | b;
+    }
+
+    // TODO: remove once ColorUtil from pr 2858 is merged
+    public static int combineRGB(@Range(from = 0, to = 255) int a, @Range(from = 0, to = 255) int r,
+                                 @Range(from = 0, to = 255) int g, @Range(from = 0, to = 255) int b) {
+        return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
     /**
@@ -1024,9 +1075,244 @@ public class GTUtility {
         return map.get(key.toWildcard());
     }
 
+    /**
+     * Check if the given item is chargeable from an EU source. <br/>
+     * Unless the {@code nativeEUToFE} option under Energy Compatibility is enabled, this will return false for RF
+     * items.
+     *
+     * @param tier if the item stores EU and is tiered, check if the given tier is greater than or equal to it.
+     */
+    public static boolean isItemChargableWithEU(@NotNull ItemStack stack, int tier) {
+        IElectricItem euItem = stack.getCapability(GregtechCapabilities.CAPABILITY_ELECTRIC_ITEM, null);
+        if (euItem != null) {
+            return euItem.chargeable() && euItem.getCharge() < euItem.getMaxCharge() && euItem.getTier() <= tier;
+        }
+
+        if (ConfigHolder.compat.energy.nativeEUToFE) {
+            IEnergyStorage rfItem = stack.getCapability(CapabilityEnergy.ENERGY, null);
+            if (rfItem != null) {
+                return rfItem.canReceive() && rfItem.getEnergyStored() < rfItem.getMaxEnergyStored();
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the level of charge from 0 to 1 of an item.
+     *
+     * @return -1 if the supplied item is not electric
+     */
+    public static float itemChargeLevel(@NotNull ItemStack stack) {
+        if (stack.isEmpty()) return 0.0f;
+
+        IElectricItem euItem = stack.getCapability(GregtechCapabilities.CAPABILITY_ELECTRIC_ITEM, null);
+        if (euItem != null) {
+            return (float) euItem.getCharge() / euItem.getMaxCharge();
+        }
+
+        IEnergyStorage rfItem = stack.getCapability(CapabilityEnergy.ENERGY, null);
+        if (rfItem != null) {
+            return (float) rfItem.getEnergyStored() / rfItem.getMaxEnergyStored();
+        }
+
+        return -1.0f;
+    }
+
+    /**
+     * Lerp between two ARGB colors
+     *
+     * @param start    the start point of the lerp
+     * @param end      the end point of the lerp
+     * @param position the position of the lerp. Must be between 0 and 1.
+     * @return the lerped color value
+     */
+    public static int argbLerp(int start, int end, float position) {
+        int aStart = (start >> 24 & 0xFF);
+        int rStart = (start >> 16 & 0xFF);
+        int gStart = (start >> 8 & 0xFF);
+        int bStart = (start & 0xFF);
+
+        int aEnd = (end >> 24 & 0xFF);
+        int rEnd = (end >> 16 & 0xFF);
+        int gEnd = (end >> 8 & 0xFF);
+        int bEnd = (end & 0xFF);
+
+        int aFinal = (int) (aStart + (aEnd - aStart) * position);
+        int rFinal = (int) (rStart + (rEnd - rStart) * position);
+        int gFinal = (int) (gStart + (gEnd - gStart) * position);
+        int bFinal = (int) (bStart + (bEnd - bStart) * position);
+
+        return (aFinal << 24) | (rFinal << 16) | (gFinal << 8) | bFinal;
+    }
+
+    /**
+     * Attempts to collapse a {@link List} of {@link ItemStack}s by combining similar stacks downwards (towards index
+     * 0). <br>
+     * WARNING: Mutates original item stacks and list, you might want to make a new list with copies!
+     *
+     * @param stacks       the list to collapse
+     * @param maxStackSize the max stack size of the to-be combined stack
+     * @param removeEmpty  if true, will remove entries from the list if they're empty after collapsing
+     */
+    public static void collapseItemList(@NotNull List<ItemStack> stacks,
+                                        @Range(from = 1, to = Integer.MAX_VALUE) int maxStackSize,
+                                        boolean removeEmpty) {
+        stacks.removeIf(Objects::isNull);
+        Hash.Strategy<ItemStack> stackStrategy = ItemStackHashStrategy.comparingAllButCount();
+
+        for (int checkingSlot = 0; checkingSlot < stacks.size(); checkingSlot++) {
+            ItemStack stackToCheck = stacks.get(checkingSlot);
+            if (stackToCheck.getCount() >= maxStackSize) continue;
+
+            for (int collapsingSlot = stacks.size() - 1; collapsingSlot > checkingSlot; collapsingSlot--) {
+                ItemStack collapsingStack = stacks.get(collapsingSlot);
+                if (collapsingStack.isEmpty()) continue;
+
+                if (stackStrategy.equals(stackToCheck, collapsingStack)) {
+                    final int checkingSize = stackToCheck.getCount();
+                    final int collapsingSize = collapsingStack.getCount();
+
+                    final int maxFinalSize = Math.min(maxStackSize, checkingSize + collapsingSize);
+                    final int toTransfer = maxFinalSize - checkingSize;
+
+                    stackToCheck.grow(toTransfer);
+                    collapsingStack.shrink(toTransfer);
+                }
+            }
+        }
+
+        if (removeEmpty) {
+            stacks.removeIf(ItemStack::isEmpty);
+        }
+    }
+
+    /**
+     * The same as {@link #collapseItemList(List, int, boolean)} but has a stack size limit of {@link Integer#MAX_VALUE}
+     * and removes empty stacks. <br>
+     * WARNING: Mutates original item stacks, you might want to make a new list with copies!
+     */
+    public static void collapseItemList(List<ItemStack> stacks) {
+        collapseItemList(stacks, Integer.MAX_VALUE, true);
+    }
+
+    /**
+     * Attempts to collapse a {@link List} of {@link FluidStack}s by combining similar stacks downwards (towards index
+     * 0). <br>
+     * WARNING: Mutates original fluid stacks and list, you might want to make a new list with copies!
+     *
+     * @param stacks       the list to collapse
+     * @param maxStackSize the max stack size of the to-be combined stack
+     * @param removeEmpty  if true, will remove entries from the list if they're empty after collapsing
+     */
+    public static void collapseFluidList(@NotNull List<FluidStack> stacks,
+                                         @Range(from = 1, to = Integer.MAX_VALUE) int maxStackSize,
+                                         boolean removeEmpty) {
+        stacks.removeIf(Objects::isNull);
+
+        for (int checkingSlot = 0; checkingSlot < stacks.size(); checkingSlot++) {
+            FluidStack stackToCheck = stacks.get(checkingSlot);
+            if (stackToCheck.amount >= maxStackSize) continue;
+
+            for (int collapsingSlot = stacks.size() - 1; collapsingSlot > checkingSlot; collapsingSlot--) {
+                FluidStack collapsingStack = stacks.get(collapsingSlot);
+                if (collapsingStack.amount < 1) continue;
+
+                if (FluidStackHashStrategy.comparingAllButAmount().equals(stackToCheck, collapsingStack)) {
+                    final int checkingSize = stackToCheck.amount;
+                    final int collapsingSize = collapsingStack.amount;
+
+                    final int maxFinalSize = Math.min(maxStackSize, checkingSize + collapsingSize);
+                    final int toTransfer = maxFinalSize - checkingSize;
+
+                    stackToCheck.amount += toTransfer;
+                    collapsingStack.amount -= toTransfer;
+                }
+            }
+        }
+
+        if (removeEmpty) {
+            stacks.removeIf(stack -> stack.amount < 1);
+        }
+    }
+
+    /**
+     * The same as {@link #collapseFluidList(List, int, boolean)} but has a stack size limit of
+     * {@link Integer#MAX_VALUE} and removes empty stacks. <br>
+     * WARNING: Mutates original fluid stacks, you might want to make a new list with copies!
+     */
+    public static void collapseFluidList(List<FluidStack> stacks) {
+        collapseFluidList(stacks, Integer.MAX_VALUE, true);
+    }
+
+    /**
+     * Calculate the durability percentage based on how much damage something has taken
+     *
+     * @param damageTaken   how many points of durability damage the item has
+     * @param maxDurability the maximum durability the item can have
+     * @return 0 = full durability, 1 = zero durability
+     */
+    public static double calculateDurabilityFromDamageTaken(int damageTaken, int maxDurability) {
+        return (double) damageTaken / maxDurability;
+    }
+
+    /**
+     * Calculate the durability percentage based on how much durability out of the maximum is remaining
+     *
+     * @param remainingDurability how much durability out of the maximum the item has left
+     * @param maxDurability       the maximum durability the item can have
+     * @return 0 = full durability, 1 = zero durability
+     */
+    public static double calculateDurabilityFromRemaining(int remainingDurability, int maxDurability) {
+        return (double) (maxDurability - remainingDurability) / maxDurability;
+    }
+
     public static boolean areFluidStacksEqual(@Nullable FluidStack a, @Nullable FluidStack b) {
         if (a == b) return true;
         if (a == null) return false;
         return a.isFluidEqual(b);
+    }
+
+    /**
+     * Check if the provided month and day is today with a given time zone.
+     */
+    public static boolean isToday(@NotNull MonthDay monthDay, @Nullable ZoneId tz) {
+        MonthDay now = tz == null ? MonthDay.now() : MonthDay.now(tz);
+        return now.equals(monthDay);
+    }
+
+    /**
+     * Check if the provided month and day is today.
+     */
+    public static boolean isToday(@NotNull MonthDay monthDay) {
+        return isToday(monthDay, null);
+    }
+
+    /**
+     * Check if two rectangles would touch or intersect.
+     */
+    public static boolean rectanglesCollide(@NotNull Rectangle2D a, @NotNull Rectangle2D b) {
+        return (a.getX() <= b.getX() + b.getWidth()) &&
+                (a.getX() + a.getWidth() >= b.getX()) &&
+                (a.getY() <= b.getY() + b.getHeight()) &&
+                (a.getY() + a.getHeight() >= b.getY());
+    }
+
+    /**
+     * Get a value multiplier based on what modifier keys the player is holding down. <br/>
+     * Returns {@code 1} if no modifiers are pressed, otherwise: <br/>
+     * - {@code shift}: x4 <br/>
+     * - {@code ctrl}: x16 <br/>
+     * - {@code alt}: x64 <br/>
+     * Holding down multiple modifiers multiplies their effects, so if the player is holding down {@code shift},
+     * {@code ctrl}, and {@code alt} all at the same time, this method will return {@code 4096}.
+     */
+    @SideOnly(Side.CLIENT)
+    public static int getButtonIncrementValue() {
+        int adjust = 1;
+        if (Interactable.hasShiftDown()) adjust *= 4;
+        if (Interactable.hasControlDown()) adjust *= 16;
+        if (Interactable.hasAltDown()) adjust *= 64;
+        return adjust;
     }
 }

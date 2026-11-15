@@ -4,40 +4,50 @@ import gregtech.api.GregTechAPI;
 import gregtech.api.capability.GregtechCapabilities;
 import gregtech.api.items.IDyeableItem;
 import gregtech.api.items.gui.ItemUIFactory;
+import gregtech.api.items.metaitem.stats.IMouseEventHandler;
 import gregtech.api.items.toolitem.behavior.IToolBehavior;
-import gregtech.api.metatileentity.MetaTileEntityHolder;
 import gregtech.api.mui.GTGuiTextures;
 import gregtech.api.mui.GTGuis;
 import gregtech.api.unification.material.Material;
 import gregtech.api.unification.material.properties.PropertyKey;
 import gregtech.api.unification.material.properties.ToolProperty;
+import gregtech.api.util.GTUtility;
 import gregtech.api.util.LocalizationUtils;
 import gregtech.api.util.TextFormattingUtil;
 import gregtech.client.utils.TooltipHelper;
-import gregtech.common.items.behaviors.ColorSprayBehaviour;
+import gregtech.common.ConfigHolder;
 import gregtech.common.metatileentities.multi.multiblockpart.MetaTileEntityMaintenanceHatch;
 import gregtech.core.network.packets.PacketToolbeltSelectionChange;
+import gregtech.core.sound.GTSoundEvents;
+
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 
 import net.minecraft.block.state.IBlockState;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.resources.I18n;
 import net.minecraft.client.util.ITooltipFlag;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.EntityEquipmentSlot;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.ItemTool;
 import net.minecraft.item.crafting.Ingredient;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.EnumHand;
+import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
+import net.minecraftforge.client.event.MouseEvent;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ICapabilityProvider;
 import net.minecraftforge.common.util.INBTSerializable;
@@ -71,12 +81,13 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
 
 import static gregtech.api.items.toolitem.ToolHelper.MATERIAL_KEY;
 
-public class ItemGTToolbelt extends ItemGTTool implements IDyeableItem {
+public class ItemGTToolbelt extends ItemGTTool implements IDyeableItem, IMouseEventHandler {
 
     private static final ThreadLocal<Integer> lastSlot = ThreadLocal.withInitial(() -> -999);
     private static final ThreadLocal<EntityPlayerMP> lastPlayer = ThreadLocal.withInitial(() -> null);
@@ -105,6 +116,19 @@ public class ItemGTToolbelt extends ItemGTTool implements IDyeableItem {
         ToolStackHandler handler = getHandler(toolbelt);
         if (slot < 0 || slot >= handler.getSlots()) return ItemStack.EMPTY;
         return handler.getStackInSlot(slot);
+    }
+
+    /**
+     * Iterate over non-empty slots of the given toolbelt.
+     */
+    public void iterateSlots(@NotNull ItemStack toolBelt, @NotNull Consumer<@NotNull ItemStack> stackConsumer) {
+        ToolStackHandler handler = getHandler(toolBelt);
+        if (handler == FALLBACK) return;
+        for (int index = 0; index < handler.getSlots(); index++) {
+            ItemStack stack = handler.getStackInSlot(index);
+            if (stack.isEmpty()) continue;
+            stackConsumer.accept(stack);
+        }
     }
 
     @Override
@@ -407,11 +431,6 @@ public class ItemGTToolbelt extends ItemGTTool implements IDyeableItem {
         }
     }
 
-    public boolean damageAgainstMaintenanceProblem(ItemStack stack, String toolClass,
-                                                   @Nullable EntityPlayer entityPlayer) {
-        return getHandler(stack).checkMaintenanceAgainstTools(toolClass, true, entityPlayer);
-    }
-
     public boolean supportsIngredient(ItemStack stack, Ingredient ingredient) {
         return getHandler(stack).checkIngredientAgainstTools(ingredient) != -1;
     }
@@ -421,7 +440,7 @@ public class ItemGTToolbelt extends ItemGTTool implements IDyeableItem {
     }
 
     private ToolStackHandler getHandler(ItemStack stack) {
-        IItemHandler handler = stack.getCapability(GregtechCapabilities.CAPABILITY_TOOLBELT_HANDLER, null);
+        IItemHandler handler = stack.getCapability(CapabilityItemHandler.ITEM_HANDLER_CAPABILITY, null);
         if (handler instanceof ToolStackHandler h) return h;
         else return FALLBACK;
     }
@@ -432,11 +451,37 @@ public class ItemGTToolbelt extends ItemGTTool implements IDyeableItem {
     }
 
     @SideOnly(Side.CLIENT)
-    public void changeSelectedToolMousewheel(int direction, ItemStack stack) {
-        ToolStackHandler handler = getHandler(stack);
-        if (direction < 0) handler.incrementSelectedSlot();
-        else handler.decrementSelectedSlot();
-        PacketToolbeltSelectionChange.toServer(handler.selectedSlot);
+    public void handleMouseEventClient(@NotNull MouseEvent event, @NotNull EntityPlayerSP playerClient,
+                                       @NotNull EnumHand hand, @NotNull ItemStack stack) {
+        if (!ConfigHolder.client.toolbeltConfig.enableToolbeltScrollingCapture || hand != EnumHand.MAIN_HAND) return;
+        if (event.getDwheel() != 0 && playerClient.isSneaking()) {
+            // vanilla code in GuiIngame line 1235 does not copy the stack before storing it in the highlighting
+            // item stack, so unless we copy the stack the tool highlight will not refresh.
+            ItemStack copy = stack.copy();
+            ToolStackHandler handler = getHandler(copy);
+            if (event.getDwheel() < 0) {
+                handler.incrementSelectedSlot();
+            } else {
+                handler.decrementSelectedSlot();
+            }
+
+            sendToServer(hand, buf -> buf.writeInt(handler.selectedSlot));
+            InventoryPlayer inv = Minecraft.getMinecraft().player.inventory;
+            inv.mainInventory.set(inv.currentItem, stack);
+            event.setCanceled(true);
+        }
+    }
+
+    @Override
+    public void handleMouseEventServer(@NotNull PacketBuffer buf, @NotNull EntityPlayerMP playerServer,
+                                       @NotNull EnumHand hand, @NotNull ItemStack stack) {
+        // Should never happen, but just in case.
+        if (hand != EnumHand.MAIN_HAND) return;
+        if (stack.getItem() instanceof ItemGTToolbelt toolbelt) {
+            playerServer.getServerWorld().playSound(null, playerServer.posX, playerServer.posY, playerServer.posZ,
+                    GTSoundEvents.CLICK, SoundCategory.PLAYERS, 2F, 1F);
+            toolbelt.setSelectedTool(buf.readInt(), stack);
+        }
     }
 
     @SideOnly(Side.CLIENT)
@@ -478,33 +523,17 @@ public class ItemGTToolbelt extends ItemGTTool implements IDyeableItem {
                                                     float hitY, float hitZ, @NotNull EnumHand hand) {
         EnumActionResult result = IDyeableItem.super.onItemUseFirst(player, world, pos, side, hitX, hitY, hitZ, hand);
         if (result == EnumActionResult.PASS) {
-            ItemStack stack = player.getHeldItem(hand);
-            ToolStackHandler handler = getHandler(stack);
-            if (handler.getSelectedStack().isEmpty() &&
-                    world.getTileEntity(pos) instanceof MetaTileEntityHolder holder &&
-                    holder.getMetaTileEntity() instanceof MetaTileEntityMaintenanceHatch maintenance) {
-                maintenance.fixMaintenanceProblemsWithToolbelt(player, this, stack);
+            ItemStack toolbeltStack = player.getHeldItem(hand);
+            ToolStackHandler handler = getHandler(toolbeltStack);
+            if (handler.getSelectedStack().isEmpty() && GTUtility.getMetaTileEntity(world,
+                    pos) instanceof MetaTileEntityMaintenanceHatch maintenanceHatch) {
+                List<ItemStack> tools = new ObjectArrayList<>();
+                iterateSlots(toolbeltStack, tools::add);
+                maintenanceHatch.fixMaintenanceProblemsWithTools(player, tools);
                 return EnumActionResult.SUCCESS;
             }
             return super.onItemUseFirst(player, world, pos, side, hitX, hitY, hitZ, hand);
         } else return result;
-    }
-
-    @Override
-    public @NotNull EnumActionResult onItemUse(@NotNull EntityPlayer player, @NotNull World world,
-                                               @NotNull BlockPos pos, @NotNull EnumHand hand,
-                                               @NotNull EnumFacing facing, float hitX, float hitY, float hitZ) {
-        ToolStackHandler handler = getHandler(player.getHeldItem(hand));
-        ItemStack selected = handler.getSelectedStack();
-        if (!selected.isEmpty()) {
-            ColorSprayBehaviour spray = ColorSprayBehaviour.getBehavior(selected);
-            if (spray != null) {
-                EnumActionResult result = spray.useFromToolbelt(player, world, pos, hand, facing, hitX, hitY, hitZ,
-                        selected);
-                if (result != EnumActionResult.PASS) return result;
-            }
-        }
-        return super.onItemUse(player, world, pos, hand, facing, hitX, hitY, hitZ);
     }
 
     @Override
@@ -749,18 +778,6 @@ public class ItemGTToolbelt extends ItemGTTool implements IDyeableItem {
             for (int i = 0; i < getSlots(); i++) {
                 if (tools[i] != null) this.toolClasses.addAll(tools[i].getToolClasses(stacks.get(i)));
             }
-        }
-
-        public boolean checkMaintenanceAgainstTools(String toolClass, boolean doCraftingDamage,
-                                                    @Nullable EntityPlayer entityPlayer) {
-            for (int i = 0; i < this.getSlots(); i++) {
-                ItemStack stack = this.getStackInSlot(i);
-                if (ToolHelper.isTool(stack, toolClass)) {
-                    if (doCraftingDamage) ToolHelper.damageItemWhenCrafting(stack, entityPlayer);
-                    return true;
-                }
-            }
-            return false;
         }
 
         public int checkIngredientAgainstTools(Ingredient ingredient) {

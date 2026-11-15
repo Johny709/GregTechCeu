@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
 
 public class GTRecipeWrapper extends AdvancedRecipeWrapper {
 
-    private static final int LINE_HEIGHT = 10;
+    static final int LINE_HEIGHT = 10;
 
     private final RecipeMap<?> recipeMap;
     private final Recipe recipe;
