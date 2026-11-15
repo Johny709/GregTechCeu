@@ -77,6 +77,7 @@ public class OreDictFilterUIManager extends BaseFilterUIManager {
             }
         };
 
+
         var caseSensitive = new BooleanSyncValue(filterReader::isCaseSensitive, setCaseSensitive);
         var matchAll = new BooleanSyncValue(filterReader::shouldMatchAll, setMatchAll);
 
